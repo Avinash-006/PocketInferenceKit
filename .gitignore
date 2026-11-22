@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+.env
+.env.*
+*.jks
+*.keystore
+*.pem
+*.p12
+*.litertlm
+docs/APPLICATION_NOTES.md

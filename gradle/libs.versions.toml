@@ -1,0 +1,9 @@
+[versions]
+agp = "9.5.2"
+android-compile = "37"
+android-compile-minor = "2"
+android-min = "24"
+android-target = "37"
+
+[libraries]
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
