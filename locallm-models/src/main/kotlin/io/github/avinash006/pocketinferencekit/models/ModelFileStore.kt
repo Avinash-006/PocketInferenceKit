@@ -1,5 +1,6 @@
 package io.github.avinash006.pocketinferencekit.models
 
+import android.annotation.SuppressLint
 import io.github.avinash006.pocketinferencekit.core.LocalLMException
 import java.io.File
 import java.io.InputStream
@@ -18,10 +19,14 @@ internal class ModelFileStore(val directory: File) {
         if (!directory.isDirectory && !directory.mkdirs() && !directory.isDirectory) {
             throw LocalLMException.DownloadFailed("Could not create the app-private model directory.")
         }
-        if (directory.usableSpace < requiredBytes) {
+        if (!hasSpace(requiredBytes)) {
             throw LocalLMException.InsufficientStorage("The model needs $requiredBytes additional bytes of free storage.")
         }
     }
+
+    // Use available bytes without asking Android to evict the host app's caches.
+    @SuppressLint("UsableSpace")
+    fun hasSpace(bytes: Long): Boolean = directory.usableSpace >= bytes
 
     suspend fun verify(file: File, model: ModelSpec) {
         if (!file.isFile) throw LocalLMException.ModelNotFound(model.id)

@@ -71,7 +71,7 @@ internal class ModelDownloadWorker(context: Context, params: WorkerParameters) :
             Result.failure(workDataOf(ERROR to STORAGE, MESSAGE to error.message))
         } catch (error: IOException) {
             when {
-                store.directory.usableSpace < model.sizeBytes - store.partial(model).length() ->
+                !store.hasSpace(model.sizeBytes - store.partial(model).length()) ->
                     Result.failure(workDataOf(ERROR to STORAGE, MESSAGE to "Free up space before retrying this model."))
                 runAttemptCount < 3 -> Result.retry()
                 else -> Result.failure(workDataOf(MESSAGE to "Download repeatedly failed. Check your connection and retry."))
