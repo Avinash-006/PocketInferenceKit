@@ -5,3 +5,7 @@ plugins {
 android {
     namespace = "io.github.avinash006.pocketinferencekit.models"
 }
+
+kotlin {
+    explicitApi()
+}

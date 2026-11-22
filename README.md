@@ -2,7 +2,7 @@
 
 PocketInferenceKit is an Android SDK in development for running large language models on-device with Kotlin and LiteRT-LM. The SDK is designed to provide streaming chat, verified model downloads, and Compose integration for apps that want to run inference locally.
 
-This repository currently contains the build scaffold and API proposal. See [the design](docs/DESIGN.md) and [upstream research](docs/RESEARCH.md) for the proposed features and device requirements.
+The core module implements streaming chat, cancellation, and CPU, GPU, and NPU selection. The model catalog, downloader, Compose helpers, and sample are in development. See [the design](docs/DESIGN.md) and [upstream research](docs/RESEARCH.md) for the API and device requirements.
 
 ## Build the scaffold
 

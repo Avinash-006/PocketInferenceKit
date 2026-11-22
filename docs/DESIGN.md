@@ -1,6 +1,6 @@
 # PocketInferenceKit API proposal
 
-This v0.1 API proposal awaits maintainer approval.
+The maintainer approved this v0.1 design. Implementation follows the milestones described below.
 
 ## Modules and coordinates
 
