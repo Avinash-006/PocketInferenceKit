@@ -6,15 +6,14 @@ import android.content.res.Configuration
 import android.os.Build
 import android.util.Log
 import com.google.ai.edge.litertlm.LiteRtLmJniException
+import io.github.avinash006.pocketinferencekit.models.DownloadManager
+import io.github.avinash006.pocketinferencekit.models.ModelCache
+import io.github.avinash006.pocketinferencekit.models.ModelLease
 import io.github.avinash006.pocketinferencekit.models.ModelSpec
 import java.io.File
-import java.io.IOException
-import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
 
@@ -22,7 +21,7 @@ import kotlinx.coroutines.withContext
 public object PocketInferenceKit {
     /**
      * Verifies, then loads [model] using the application [context] and [config] off the main thread.
-     * In this milestone the verified file must already be installed in the app's model directory.
+     * Downloads a catalog model when necessary, and reuses its app-private cached copy on subsequent loads.
      */
     public suspend fun load(
         context: Context,
@@ -37,6 +36,7 @@ public object PocketInferenceKit {
         dispatcher: CoroutineDispatcher,
     ): LocalLMEngine {
         val app = context.applicationContext
+        var modelLease: ModelLease? = null
         var runtime: NativeEngine? = null
         var managed: RuntimeEngine? = null
         try {
@@ -45,10 +45,10 @@ public object PocketInferenceKit {
                 if (abi.none { it == "arm64-v8a" || it == "x86_64" }) {
                     throw LocalLMException.UnsupportedDevice("LiteRT-LM requires arm64-v8a or x86_64 Android.")
                 }
-                val modelFile = File(
-                    app.noBackupFilesDir, "pocketinferencekit/models/${model.sha256.lowercase()}.litertlm",
-                )
-                verifyInstalledModel(model, modelFile)
+                val models = ModelCache(app)
+                if (!models.isInstalled(model)) DownloadManager(app).awaitInstalled(model)
+                val lease = models.acquire(model)
+                modelLease = lease
                 val cache = File(app.cacheDir, "pocketinferencekit/runtime/${model.sha256.lowercase()}")
                 if (!cache.isDirectory && !cache.mkdirs() && !cache.isDirectory) {
                     throw LocalLMException.BackendInitFailed("Could not prepare the inference cache directory.")
@@ -61,7 +61,7 @@ public object PocketInferenceKit {
                     },
                 ) { backend ->
                     LiteRtRuntime.open(
-                        modelFile.absolutePath,
+                        lease.file.absolutePath,
                         cache.absolutePath,
                         backend,
                         config.contextLength ?: config.maxTokens,
@@ -75,9 +75,13 @@ public object PocketInferenceKit {
                     }
                 }
                 var callbacks: ComponentCallbacks2? = null
-                val engine = RuntimeEngine(selectedBackend, selectedRuntime, dispatcher, unregisterCallbacks = {
-                    callbacks?.let(app::unregisterComponentCallbacks)
-                })
+                val engine = RuntimeEngine(
+                    selectedBackend,
+                    selectedRuntime,
+                    dispatcher,
+                    unregisterCallbacks = { callbacks?.let(app::unregisterComponentCallbacks) },
+                    releaseModel = lease::close,
+                )
                 managed = engine
                 if (config.unloadOnLowMemory) {
                     callbacks = MemoryCallbacks(engine)
@@ -90,7 +94,11 @@ public object PocketInferenceKit {
                 try {
                     val initialized = managed
                     if (initialized == null) {
-                        runtime?.close()
+                        try {
+                            runtime?.close()
+                        } finally {
+                            modelLease?.close()
+                        }
                     } else {
                         initialized.close()
                         initialized.awaitClosed()
@@ -135,27 +143,6 @@ internal fun <T> selectBackend(
     )
     failures.dropLast(1).forEach(failure::addSuppressed)
     throw failure
-}
-
-private suspend fun verifyInstalledModel(model: ModelSpec, file: File) {
-    if (!file.isFile) throw LocalLMException.ModelNotFound(model.id)
-    if (file.length() != model.sizeBytes) throw LocalLMException.ChecksumMismatch(model.id)
-    val digest = MessageDigest.getInstance("SHA-256")
-    try {
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val size = input.read(buffer)
-                if (size < 0) break
-                digest.update(buffer, 0, size)
-            }
-        }
-    } catch (error: IOException) {
-        throw LocalLMException.DownloadFailed("Could not read the installed model. Check storage and reinstall the model.", error)
-    }
-    val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
-    if (!actual.equals(model.sha256, ignoreCase = true)) throw LocalLMException.ChecksumMismatch(model.id)
 }
 
 @Suppress("DEPRECATION")

@@ -38,6 +38,7 @@ internal class RuntimeEngine(
     private val native: NativeEngine,
     private val dispatcher: CoroutineDispatcher,
     private val unregisterCallbacks: () -> Unit = {},
+    private val releaseModel: () -> Unit = {},
     private val monotonicNanos: () -> Long = System::nanoTime,
 ) : LocalLMEngine {
     private val stateLock = Any()
@@ -102,6 +103,7 @@ internal class RuntimeEngine(
             }
             release(unregisterCallbacks)
             nativeLock.withLock { release(native::close) }
+            release(releaseModel)
             val first = failures.firstOrNull()
             if (first == null) {
                 released.complete(Unit)
