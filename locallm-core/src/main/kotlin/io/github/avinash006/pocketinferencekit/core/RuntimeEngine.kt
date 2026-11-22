@@ -17,19 +17,33 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
 
 internal interface NativeEngine : AutoCloseable {
     fun openConversation(
         prompt: String?,
         history: List<ChatMessage>,
         config: GenerationConfig,
+        tools: ToolRegistry = ToolRegistry.Empty,
     ): NativeConversation
 }
 
 internal interface NativeConversation : AutoCloseable {
-    fun stream(prompt: String): Flow<String>
+    fun stream(input: ConversationInput, maxOutputTokens: Int?): Flow<ConversationOutput>
     fun measurements(): DecodeMeasurements? = null
 }
+
+internal sealed interface ConversationInput {
+    data class Prompt(val text: String) : ConversationInput
+    data class ToolResults(val results: List<ToolResult>) : ConversationInput
+}
+
+internal sealed interface ConversationOutput {
+    data class Text(val text: String) : ConversationOutput
+    data class ToolCall(val call: StructuredToolCall) : ConversationOutput
+}
+
+internal data class ToolResult(val name: String, val value: JsonElement)
 
 internal data class DecodeMeasurements(val tokens: Int, val tokensPerSecond: Double)
 
@@ -52,6 +66,7 @@ internal class RuntimeEngine(
         generationConfig: GenerationConfig,
         history: List<ChatMessage>,
         historyTrimmer: HistoryTrimmer,
+        tools: ToolRegistry,
     ): ChatSession = synchronized(stateLock) {
         if (closing) throw LocalLMException.Cancelled("The inference engine is closed.")
         RuntimeChat(
@@ -60,6 +75,7 @@ internal class RuntimeEngine(
             config = generationConfig.copy(stopSequences = generationConfig.stopSequences.toList()),
             history = history.toList(),
             historyTrimmer = historyTrimmer,
+            tools = tools,
             dispatcher = dispatcher,
             monotonicNanos = monotonicNanos,
         ).also(sessions::add)
@@ -125,6 +141,7 @@ internal class RuntimeChat(
     private val config: GenerationConfig,
     history: List<ChatMessage>,
     private val historyTrimmer: HistoryTrimmer,
+    private val tools: ToolRegistry,
     private val dispatcher: CoroutineDispatcher,
     private val monotonicNanos: () -> Long,
 ) : ChatSession {
@@ -167,15 +184,12 @@ internal class RuntimeChat(
             }
 
             val decode = engine.withNative { native ->
-                val conversation = native.openConversation(systemPrompt, history, config)
+                val conversation = native.openConversation(systemPrompt, history, config, tools)
                 var generationError: Throwable? = null
                 try {
-                    conversation.stream(prompt).takeWhile { chunk ->
-                        emitText(filter.append(chunk))
-                        !filter.stopped
-                    }.collect()
-                    emitText(filter.finish())
-                    if (filter.stopped) null else conversation.measurements()
+                    runTurn(conversation, prompt, filter, ::emitText) { name, arguments ->
+                        send(GenerationEvent.ToolCall(name, arguments))
+                    }
                 } catch (error: Throwable) {
                     generationError = error
                     throw error
@@ -226,13 +240,80 @@ internal class RuntimeChat(
             when (event) {
                 is GenerationEvent.Token -> emit(event.text)
                 is GenerationEvent.Error -> throw event.exception
-                is GenerationEvent.Finished -> Unit
+                is GenerationEvent.Finished, is GenerationEvent.ToolCall -> Unit
             }
         }
     }
 
     override suspend fun sendAndAwait(prompt: String): String =
         buildString { sendText(prompt).collect { append(it) } }
+
+    private suspend fun runTurn(
+        conversation: NativeConversation,
+        prompt: String,
+        filter: StopSequenceFilter,
+        emitText: suspend (String) -> Unit,
+        onToolCall: suspend (String, kotlinx.serialization.json.JsonObject) -> Unit,
+    ): DecodeMeasurements? {
+        var input: ConversationInput = ConversationInput.Prompt(prompt)
+        var rounds = 0
+        var remaining = config.maxNewTokens
+        var measuredTokens = 0
+        var decodeSeconds = 0.0
+        var allStepsMeasured = true
+        while (true) {
+            val calls = mutableListOf<StructuredToolCall>()
+            conversation.stream(input, remaining).takeWhile { output ->
+                when (output) {
+                    is ConversationOutput.Text -> emitText(filter.append(output.text))
+                    is ConversationOutput.ToolCall -> {
+                        if (calls.size >= MAX_TOOL_CALLS_PER_ROUND) {
+                            throw LocalLMException.ToolExecutionFailed("The model requested too many tools in one round.")
+                        }
+                        calls += output.call
+                    }
+                }
+                !filter.stopped
+            }.collect()
+            if (filter.stopped) return null
+            val step = conversation.measurements()
+            if (step == null) {
+                allStepsMeasured = false
+            } else {
+                measuredTokens += step.tokens
+                decodeSeconds += step.tokens / step.tokensPerSecond
+                remaining = remaining?.minus(step.tokens)
+            }
+            if (calls.isEmpty()) {
+                emitText(filter.finish())
+                return if (allStepsMeasured && decodeSeconds > 0) {
+                    DecodeMeasurements(measuredTokens, measuredTokens / decodeSeconds)
+                } else {
+                    null
+                }
+            }
+            if (rounds >= tools.maxRounds) {
+                throw LocalLMException.ToolExecutionFailed("The model reached the tool round limit.")
+            }
+            if (remaining != null && remaining <= 0) {
+                throw LocalLMException.GenerationFailed("The response token budget ended before the model could continue.")
+            }
+            val prepared = calls.map(tools::prepare)
+            val results = prepared.map { (registration, arguments) ->
+                onToolCall(registration.name, arguments)
+                val value = try {
+                    registration.execute(arguments).also { it.checkToolJsonBounds() }
+                } catch (error: java.util.concurrent.CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw LocalLMException.ToolExecutionFailed("Tool '${registration.name}' could not complete.", error)
+                }
+                ToolResult(registration.name, value)
+            }
+            input = ConversationInput.ToolResults(results)
+            rounds++
+        }
+    }
 
     override fun close() {
         val job = synchronized(stateLock) {
@@ -253,5 +334,7 @@ internal class RuntimeChat(
         if (completed) engine.remove(this)
     }
 }
+
+private const val MAX_TOOL_CALLS_PER_ROUND = 8
 
 private class SessionClosedCancellation : java.util.concurrent.CancellationException("The chat was closed.")

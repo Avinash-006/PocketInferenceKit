@@ -11,6 +11,7 @@ public interface LocalLMEngine : AutoCloseable {
         generationConfig: GenerationConfig = GenerationConfig(),
         history: List<ChatMessage> = emptyList(),
         historyTrimmer: HistoryTrimmer = HistoryTrimmer.DropOldest,
+        tools: ToolRegistry = ToolRegistry.Empty,
     ): ChatSession
 
     /** Idempotently requests that every chat and the native engine close. */

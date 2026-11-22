@@ -45,6 +45,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import io.github.avinash006.pocketinferencekit.core.ChatMessage
 import io.github.avinash006.pocketinferencekit.core.ChatRole
 import io.github.avinash006.pocketinferencekit.models.DownloadState
@@ -52,8 +54,10 @@ import io.github.avinash006.pocketinferencekit.models.ModelCatalog
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ExperimentalFlags.enableBenchmark = true
         enableEdgeToEdge()
         setContent {
             val colors = if (isSystemInDarkTheme()) {
@@ -75,7 +79,13 @@ private fun PocketDemo(model: SampleViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (state.chatOpen) state.selected.displayName else "PocketInferenceKit")
+                    Text(
+                        when {
+                            state.toolMode && state.chatOpen -> "Tool demo"
+                            state.chatOpen -> state.selected.displayName
+                            else -> "PocketInferenceKit"
+                        },
+                    )
                 },
                 navigationIcon = {
                     if (state.chatOpen) TextButton(model::backToModels) { Text("Models") }
@@ -177,6 +187,9 @@ private fun ModelPicker(state: SampleState, model: SampleViewModel, modifier: Mo
                 if (installed) TextButton(model::delete, enabled = !state.loading) { Text("Remove") }
             }
         }
+        item {
+            OutlinedButton(model::openTools, enabled = installed && !state.loading) { Text("Tool demo") }
+        }
         state.error?.let { message ->
             item { ErrorCard(message, model::dismissError) }
         }
@@ -216,6 +229,17 @@ private fun ChatScreen(state: SampleState, model: SampleViewModel, modifier: Mod
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(messages) { message -> ChatBubble(message) }
+        }
+        if (state.toolMode) {
+            Text(
+                state.toolCalls.takeIf { it.isNotEmpty() }?.joinToString(" → ")
+                    ?: "Tool calls appear here when the model requests them.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ model.setDraft("What is the current UTC time?") }) { Text("Try the clock") }
+                OutlinedButton({ model.setDraft("Use the calculator to multiply 17 by 23.") }) { Text("Try arithmetic") }
+            }
         }
         state.error?.let { ErrorCard(it, model::dismissError) }
         OutlinedTextField(

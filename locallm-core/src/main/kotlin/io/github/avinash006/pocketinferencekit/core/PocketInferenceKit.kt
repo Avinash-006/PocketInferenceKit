@@ -71,7 +71,7 @@ public object PocketInferenceKit {
                 runtime = selectedRuntime
                 if (config.warmup) {
                     selectedRuntime.openConversation(null, emptyList(), GenerationConfig(maxNewTokens = 1)).use {
-                        it.stream("Hi").collect()
+                        it.stream(ConversationInput.Prompt("Hi"), maxOutputTokens = 1).collect()
                     }
                 }
                 var callbacks: ComponentCallbacks2? = null

@@ -19,6 +19,7 @@ android {
 dependencies {
     implementation(project(":locallm-core"))
     implementation(libs.activity.compose)
+    implementation(libs.litert.lm)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(platform(libs.compose.bom))

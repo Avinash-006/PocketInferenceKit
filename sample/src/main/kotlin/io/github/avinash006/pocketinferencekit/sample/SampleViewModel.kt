@@ -15,6 +15,7 @@ import io.github.avinash006.pocketinferencekit.core.GenerationStats
 import io.github.avinash006.pocketinferencekit.core.LocalLMEngine
 import io.github.avinash006.pocketinferencekit.core.LocalLMException
 import io.github.avinash006.pocketinferencekit.core.PocketInferenceKit
+import io.github.avinash006.pocketinferencekit.core.ToolRegistry
 import io.github.avinash006.pocketinferencekit.models.DownloadManager
 import io.github.avinash006.pocketinferencekit.models.DownloadState
 import io.github.avinash006.pocketinferencekit.models.ModelCache
@@ -40,6 +41,8 @@ internal data class SampleState(
     val installed: Set<String> = emptySet(),
     val wifiOnly: Boolean = false,
     val chatOpen: Boolean = false,
+    val toolMode: Boolean = false,
+    val toolCalls: List<String> = emptyList(),
     val loading: Boolean = false,
     val messages: List<ChatMessage> = emptyList(),
     val pendingPrompt: String? = null,
@@ -76,7 +79,7 @@ internal class SampleViewModel(
     init {
         observeSelected()
         refreshCache()
-        if (saved.get<Boolean>(CHAT) == true) openChat()
+        if (saved.get<Boolean>(CHAT) == true) open(saved.get<Boolean>(TOOLS) == true)
     }
 
     fun select(model: ModelSpec) {
@@ -107,7 +110,11 @@ internal class SampleViewModel(
         observeSelected()
     }
 
-    fun openChat() {
+    fun openChat() = open(toolMode = false)
+
+    fun openTools() = open(toolMode = true)
+
+    private fun open(toolMode: Boolean) {
         if (loading?.isActive == true || engine != null) return
         val snapshot = state.value
         val model = snapshot.selected
@@ -117,21 +124,33 @@ internal class SampleViewModel(
             try {
                 closingEngine?.awaitClosed()
                 closingEngine = null
-                val history = withContext(Dispatchers.IO) { loadHistory(model) }
+                val history = withContext(Dispatchers.IO) { loadHistory(model, toolMode) }
                 if (model.sha256 !in snapshot.installed && snapshot.download !is DownloadState.Paused) {
                     downloads.start(model, snapshot.wifiOnly)
                 }
                 val active = PocketInferenceKit.load(application, model)
                 opened = active
                 currentCoroutineContext().ensureActive()
-                val chat = active.newChat("You are a helpful assistant. Keep answers concise.", history = history)
+                val instruction = if (toolMode) {
+                    "Use the registered clock and calculator tools when relevant. Keep answers concise."
+                } else {
+                    "You are a helpful assistant. Keep answers concise."
+                }
+                val chat = active.newChat(
+                    instruction,
+                    history = history,
+                    tools = if (toolMode) sampleTools else ToolRegistry.Empty,
+                )
                 engine = active
                 session = chat
                 opened = null
                 saved[CHAT] = true
+                saved[TOOLS] = toolMode
                 mutableState.update {
                     it.copy(
                         chatOpen = true,
+                        toolMode = toolMode,
+                        toolCalls = emptyList(),
                         messages = history,
                         loading = false,
                         backend = active.activeBackend,
@@ -170,7 +189,7 @@ internal class SampleViewModel(
         val prompt = snapshot.draft.trim()
         if (prompt.isBlank() || generation?.isActive == true) return
         setDraft("")
-        mutableState.update { it.copy(pendingPrompt = prompt, streaming = "", error = null) }
+        mutableState.update { it.copy(pendingPrompt = prompt, streaming = "", error = null, toolCalls = emptyList()) }
         generation = viewModelScope.launch {
             var finished = false
             val text = StringBuilder()
@@ -181,12 +200,15 @@ internal class SampleViewModel(
                             text.append(event.text)
                             mutableState.update { it.copy(streaming = text.toString()) }
                         }
+                        is GenerationEvent.ToolCall -> {
+                            mutableState.update { it.copy(toolCalls = it.toolCalls + event.name) }
+                        }
                         is GenerationEvent.Finished -> {
                             val messages = (snapshot.messages + ChatMessage(ChatRole.User, prompt) +
                                 ChatMessage(ChatRole.Assistant, text.toString())).takeLast(MAX_HISTORY)
                             finished = true
                             mutableState.update { it.copy(messages = messages, stats = event.stats, pendingPrompt = null, streaming = "") }
-                            withContext(Dispatchers.IO) { saveHistory(snapshot.selected, messages) }
+                            withContext(Dispatchers.IO) { saveHistory(snapshot.selected, snapshot.toolMode, messages) }
                         }
                         is GenerationEvent.Error -> throw event.exception
                     }
@@ -265,8 +287,8 @@ internal class SampleViewModel(
         mutableState.update { it.copy(error = error.message ?: "The operation failed. Try again.") }
     }
 
-    private fun loadHistory(model: ModelSpec): List<ChatMessage> {
-        val encoded = preferences.getString("history_${model.id}", null) ?: return emptyList()
+    private fun loadHistory(model: ModelSpec, toolMode: Boolean): List<ChatMessage> {
+        val encoded = preferences.getString("history_${model.id}_$toolMode", null) ?: return emptyList()
         val messages = JSONArray(encoded)
         return List(messages.length()) { index ->
             val item = messages.getJSONObject(index)
@@ -276,12 +298,12 @@ internal class SampleViewModel(
 
     // Check the synchronous commit result. The edit KTX helper returns Unit.
     @SuppressLint("UseKtx")
-    private fun saveHistory(model: ModelSpec, messages: List<ChatMessage>) {
+    private fun saveHistory(model: ModelSpec, toolMode: Boolean, messages: List<ChatMessage>) {
         val encoded = JSONArray()
         for (message in messages) {
             encoded.put(JSONObject().put("role", message.role.name).put("text", message.text.take(MAX_MESSAGE_CHARS)))
         }
-        if (!preferences.edit().putString("history_${model.id}", encoded.toString()).commit()) {
+        if (!preferences.edit().putString("history_${model.id}_$toolMode", encoded.toString()).commit()) {
             error("Could not save the chat on this device.")
         }
     }
@@ -290,6 +312,7 @@ internal class SampleViewModel(
         const val SELECTED = "selected"
         const val WIFI = "wifi"
         const val CHAT = "chat"
+        const val TOOLS = "tools"
         const val DRAFT = "draft"
         const val MAX_HISTORY = 32
         const val MAX_MESSAGE_CHARS = 16_000

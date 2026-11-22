@@ -1,5 +1,7 @@
 package io.github.avinash006.pocketinferencekit.core
 
+import kotlinx.serialization.json.JsonObject
+
 /**
  * Measurements for one generation turn.
  *
@@ -17,6 +19,9 @@ public data class GenerationStats(
 public sealed interface GenerationEvent {
     /** Incremental visible output in [text]. */
     public data class Token(public val text: String) : GenerationEvent
+
+    /** The model requested registered tool [name] with validated [arguments]. */
+    public data class ToolCall(public val name: String, public val arguments: JsonObject) : GenerationEvent
 
     /** Successful completion with the turn's [stats]. */
     public data class Finished(public val stats: GenerationStats) : GenerationEvent

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -211,11 +212,13 @@ private class FakeEngine(
         prompt: String?,
         history: List<ChatMessage>,
         config: GenerationConfig,
+        tools: ToolRegistry,
     ): NativeConversation {
         histories += history
         systemPrompts += prompt
         return object : NativeConversation {
-            override fun stream(prompt: String): Flow<String> = responses(prompt)
+            override fun stream(input: ConversationInput, maxOutputTokens: Int?): Flow<ConversationOutput> =
+                responses((input as ConversationInput.Prompt).text).map { ConversationOutput.Text(it) }
             override fun measurements(): DecodeMeasurements? = metrics
 
             override fun close() {
