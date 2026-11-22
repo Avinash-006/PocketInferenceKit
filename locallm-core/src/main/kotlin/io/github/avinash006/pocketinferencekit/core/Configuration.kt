@@ -59,7 +59,7 @@ public data class GenerationConfig(
     public val seed: Int? = null,
 ) {
     init {
-        require(temperature == null || temperature.isFinite() && temperature >= 0)
+        require(temperature == null || (temperature.isFinite() && temperature >= 0))
         require(topK == null || topK > 0)
         require(topP == null || topP in 0.0..1.0)
         require(maxNewTokens == null || maxNewTokens > 0)

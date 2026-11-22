@@ -23,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -47,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
+import io.github.avinash006.pocketinferencekit.compose.DownloadProgress
 import io.github.avinash006.pocketinferencekit.core.ChatMessage
 import io.github.avinash006.pocketinferencekit.core.ChatRole
 import io.github.avinash006.pocketinferencekit.models.DownloadState
@@ -60,11 +60,12 @@ class MainActivity : ComponentActivity() {
         ExperimentalFlags.enableBenchmark = true
         enableEdgeToEdge()
         setContent {
-            val colors = if (isSystemInDarkTheme()) {
-                darkColorScheme(primary = Color(0xFFAEE8D0), secondary = Color(0xFFB4C8F3))
-            } else {
-                lightColorScheme(primary = Color(0xFF17684F), secondary = Color(0xFF435982))
-            }
+            val colors =
+                if (isSystemInDarkTheme()) {
+                    darkColorScheme(primary = Color(0xFFAEE8D0), secondary = Color(0xFFB4C8F3))
+                } else {
+                    lightColorScheme(primary = Color(0xFF17684F), secondary = Color(0xFF435982))
+                }
             MaterialTheme(colorScheme = colors) { PocketDemo() }
         }
     }
@@ -103,7 +104,11 @@ private fun PocketDemo(model: SampleViewModel = viewModel()) {
 }
 
 @Composable
-private fun ModelPicker(state: SampleState, model: SampleViewModel, modifier: Modifier = Modifier) {
+private fun ModelPicker(
+    state: SampleState,
+    model: SampleViewModel,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val installed = state.selected.sha256 in state.installed || state.download is DownloadState.Completed
     LazyColumn(
@@ -117,7 +122,9 @@ private fun ModelPicker(state: SampleState, model: SampleViewModel, modifier: Mo
             OutlinedCard(onClick = { model.select(spec) }, enabled = !state.loading) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(spec.displayName, style = MaterialTheme.typography.titleMedium)
-                    val fileSize = android.text.format.Formatter.formatFileSize(context, spec.sizeBytes)
+                    val fileSize =
+                        android.text.format.Formatter
+                            .formatFileSize(context, spec.sizeBytes)
                     val ram = spec.minRamMb?.let { "$it MiB RAM" } ?: "RAM requirement varies by device"
                     Text("$fileSize · $ram", style = MaterialTheme.typography.bodyMedium)
                     if (spec.sha256 in state.installed) Text("Installed", color = MaterialTheme.colorScheme.primary)
@@ -139,39 +146,7 @@ private fun ModelPicker(state: SampleState, model: SampleViewModel, modifier: Mo
                 )
             }
         }
-        item {
-            when (val status = state.download) {
-                is DownloadState.Running -> {
-                    TransferProgress("Downloading", status.receivedBytes, status.sizeBytes)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(model::pause) { Text("Pause") }
-                        TextButton(model::cancel) { Text("Cancel") }
-                    }
-                }
-                is DownloadState.Waiting -> {
-                    TransferProgress("Waiting for a network or background time", status.receivedBytes, status.sizeBytes)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(model::pause) { Text("Pause") }
-                        TextButton(model::cancel) { Text("Cancel") }
-                    }
-                }
-                is DownloadState.Paused -> {
-                    TransferProgress("Paused", status.receivedBytes, status.sizeBytes)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(model::resume) { Text("Resume") }
-                        TextButton(model::cancel) { Text("Cancel") }
-                    }
-                }
-                is DownloadState.Failed -> {
-                    Text(status.exception.message.orEmpty(), color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(model::download) { Text("Retry download") }
-                }
-                DownloadState.Cancelled, DownloadState.Idle -> {
-                    if (!installed) OutlinedButton(model::download) { Text("Download only") }
-                }
-                DownloadState.Completed -> Unit
-            }
-        }
+        item { DownloadControls(state.download, installed, model) }
         item {
             val canOpen = !state.loading && state.download !is DownloadState.Paused
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -197,29 +172,72 @@ private fun ModelPicker(state: SampleState, model: SampleViewModel, modifier: Mo
 }
 
 @Composable
-private fun TransferProgress(label: String, bytes: Long, total: Long) {
-    val progress = if (total == 0L) 0f else (bytes.toDouble() / total).toFloat().coerceIn(0f, 1f)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("$label · ${(progress * 100).toInt()}%")
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+private fun DownloadControls(
+    status: DownloadState,
+    installed: Boolean,
+    model: SampleViewModel,
+) {
+    when (status) {
+        is DownloadState.Running, is DownloadState.Waiting, is DownloadState.Paused -> {
+            ModelTransferProgress(status)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (status is DownloadState.Paused) {
+                    OutlinedButton(model::resume) { Text("Resume") }
+                } else {
+                    OutlinedButton(model::pause) { Text("Pause") }
+                }
+                TextButton(model::cancel) { Text("Cancel") }
+            }
+        }
+
+        is DownloadState.Failed -> {
+            Text(status.exception.message.orEmpty(), color = MaterialTheme.colorScheme.error)
+            OutlinedButton(model::download) { Text("Retry download") }
+        }
+
+        DownloadState.Cancelled, DownloadState.Idle -> {
+            if (!installed) OutlinedButton(model::download) { Text("Download only") }
+        }
+
+        DownloadState.Completed -> {
+            return
+        }
     }
 }
 
 @Composable
-private fun ChatScreen(state: SampleState, model: SampleViewModel, modifier: Modifier = Modifier) {
+private fun ModelTransferProgress(status: DownloadState) {
+    DownloadProgress(
+        status,
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        indicatorColor = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun ChatScreen(
+    state: SampleState,
+    model: SampleViewModel,
+    modifier: Modifier = Modifier,
+) {
     val recents = rememberLazyListState()
     val pending = state.pendingPrompt
-    val messages = if (pending == null) state.messages else {
-        state.messages + ChatMessage(ChatRole.User, pending) + ChatMessage(ChatRole.Assistant, state.streaming.ifEmpty { "Generating…" })
-    }
+    val messages =
+        if (pending == null) {
+            state.messages
+        } else {
+            state.messages + ChatMessage(ChatRole.User, pending) + ChatMessage(ChatRole.Assistant, state.streaming.ifEmpty { "Generating…" })
+        }
     LaunchedEffect(messages.size, state.streaming.length) {
         if (messages.isNotEmpty()) recents.scrollToItem(messages.lastIndex)
     }
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip(onClick = {}, enabled = false, label = { Text(state.backend?.name ?: "Backend pending") })
-            val rate = state.stats?.tokensPerSecond?.let { String.format(Locale.getDefault(), "%.1f tok/s", it) }
-                ?: "— tok/s"
+            val rate =
+                state.stats?.tokensPerSecond?.let { String.format(Locale.getDefault(), "%.1f tok/s", it) }
+                    ?: "— tok/s"
             AssistChip(onClick = {}, enabled = false, label = { Text(rate) })
         }
         LazyColumn(
@@ -266,10 +284,15 @@ private fun ChatBubble(message: ChatMessage) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (fromUser) Arrangement.End else Arrangement.Start) {
         Card(
             modifier = Modifier.fillMaxWidth(if (fromUser) 0.83f else 0.94f),
-            colors = CardDefaults.cardColors(
-                containerColor = if (fromUser) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceVariant,
-            ),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor =
+                        if (fromUser) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                ),
         ) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(if (fromUser) "You" else "Model", style = MaterialTheme.typography.labelMedium)
@@ -280,7 +303,10 @@ private fun ChatBubble(message: ChatMessage) {
 }
 
 @Composable
-private fun ErrorCard(message: String, dismiss: () -> Unit) {
+private fun ErrorCard(
+    message: String,
+    dismiss: () -> Unit,
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text(message)

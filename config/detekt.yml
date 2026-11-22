@@ -1,0 +1,37 @@
+build:
+  maxIssues: 0
+
+complexity:
+  CyclomaticComplexMethod:
+    threshold: 21
+  LongMethod:
+    threshold: 110
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  TooManyFunctions:
+    thresholdInClasses: 26
+  NestedBlockDepth:
+    threshold: 6
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: [Composable]
+  MatchingDeclarationName:
+    mustBeFirst: false
+
+style:
+  MaxLineLength:
+    active: false
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 7
+  ThrowsCount:
+    max: 6
+  UnusedPrivateMember:
+    ignoreAnnotated: [Composable]

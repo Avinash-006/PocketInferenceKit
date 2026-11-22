@@ -1,3 +1,6 @@
 * text=auto
 gradlew text eol=lf
 gradlew.bat text eol=crlf
+
+# JetBrains ABI dumps include a final separator line.
+*.api whitespace=-blank-at-eof

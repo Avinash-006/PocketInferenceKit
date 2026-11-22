@@ -31,4 +31,4 @@ jobs:
           fi
       - uses: gradle/actions/setup-gradle@v5
       - name: Build, lint, and run unit tests
-        run: ./gradlew --no-daemon build lint testDebugUnitTest
+        run: ./gradlew --no-daemon build lint testDebugUnitTest spotlessCheck detekt apiCheck

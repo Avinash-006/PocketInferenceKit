@@ -1,0 +1,191 @@
+public final class io/github/avinash006/pocketinferencekit/core/Backend : java/lang/Enum {
+	public static final field Auto Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public static final field CPU Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public static final field GPU Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public static final field NPU Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public static fun values ()[Lio/github/avinash006/pocketinferencekit/core/Backend;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/ChatMessage {
+	public fun <init> (Lio/github/avinash006/pocketinferencekit/core/ChatRole;Ljava/lang/String;)V
+	public final fun component1 ()Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lio/github/avinash006/pocketinferencekit/core/ChatRole;Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/core/ChatMessage;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/ChatMessage;Lio/github/avinash006/pocketinferencekit/core/ChatRole;Ljava/lang/String;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/ChatMessage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRole ()Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/ChatRole : java/lang/Enum {
+	public static final field Assistant Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+	public static final field User Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+	public static fun values ()[Lio/github/avinash006/pocketinferencekit/core/ChatRole;
+}
+
+public abstract interface class io/github/avinash006/pocketinferencekit/core/ChatSession : java/lang/AutoCloseable {
+	public abstract fun awaitClosed (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun close ()V
+	public abstract fun send (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun sendAndAwait (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun sendText (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/EngineConfig {
+	public fun <init> ()V
+	public fun <init> (Lio/github/avinash006/pocketinferencekit/core/Backend;Ljava/lang/Integer;Ljava/lang/Integer;ZZLjava/lang/String;)V
+	public synthetic fun <init> (Lio/github/avinash006/pocketinferencekit/core/Backend;Ljava/lang/Integer;Ljava/lang/Integer;ZZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Lio/github/avinash006/pocketinferencekit/core/Backend;Ljava/lang/Integer;Ljava/lang/Integer;ZZLjava/lang/String;)Lio/github/avinash006/pocketinferencekit/core/EngineConfig;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/EngineConfig;Lio/github/avinash006/pocketinferencekit/core/Backend;Ljava/lang/Integer;Ljava/lang/Integer;ZZLjava/lang/String;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/EngineConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContextLength ()Ljava/lang/Integer;
+	public final fun getMaxTokens ()Ljava/lang/Integer;
+	public final fun getNpuLibraryDirectory ()Ljava/lang/String;
+	public final fun getPreferredBackend ()Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public final fun getUnloadOnLowMemory ()Z
+	public final fun getWarmup ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationConfig {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Double;Ljava/lang/Integer;Ljava/lang/Double;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/Double;Ljava/lang/Integer;Ljava/lang/Double;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Double;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Double;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/Double;Ljava/lang/Integer;Ljava/lang/Double;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/Integer;)Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;Ljava/lang/Double;Ljava/lang/Integer;Ljava/lang/Double;Ljava/lang/Integer;Ljava/util/List;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxNewTokens ()Ljava/lang/Integer;
+	public final fun getSeed ()Ljava/lang/Integer;
+	public final fun getStopSequences ()Ljava/util/List;
+	public final fun getTemperature ()Ljava/lang/Double;
+	public final fun getTopK ()Ljava/lang/Integer;
+	public final fun getTopP ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/avinash006/pocketinferencekit/core/GenerationEvent {
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationEvent$Error : io/github/avinash006/pocketinferencekit/core/GenerationEvent {
+	public fun <init> (Lio/github/avinash006/pocketinferencekit/core/LocalLMException;)V
+	public final fun component1 ()Lio/github/avinash006/pocketinferencekit/core/LocalLMException;
+	public final fun copy (Lio/github/avinash006/pocketinferencekit/core/LocalLMException;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Error;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Error;Lio/github/avinash006/pocketinferencekit/core/LocalLMException;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Error;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getException ()Lio/github/avinash006/pocketinferencekit/core/LocalLMException;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationEvent$Finished : io/github/avinash006/pocketinferencekit/core/GenerationEvent {
+	public fun <init> (Lio/github/avinash006/pocketinferencekit/core/GenerationStats;)V
+	public final fun component1 ()Lio/github/avinash006/pocketinferencekit/core/GenerationStats;
+	public final fun copy (Lio/github/avinash006/pocketinferencekit/core/GenerationStats;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Finished;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Finished;Lio/github/avinash006/pocketinferencekit/core/GenerationStats;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Finished;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStats ()Lio/github/avinash006/pocketinferencekit/core/GenerationStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationEvent$Token : io/github/avinash006/pocketinferencekit/core/GenerationEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Token;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Token;Ljava/lang/String;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$Token;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationEvent$ToolCall : io/github/avinash006/pocketinferencekit/core/GenerationEvent {
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$ToolCall;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$ToolCall;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$ToolCall;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArguments ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/GenerationStats {
+	public fun <init> (Ljava/lang/Long;Ljava/lang/Double;Ljava/lang/Integer;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component2 ()Ljava/lang/Double;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/Long;Ljava/lang/Double;Ljava/lang/Integer;)Lio/github/avinash006/pocketinferencekit/core/GenerationStats;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/core/GenerationStats;Ljava/lang/Long;Ljava/lang/Double;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/GenerationStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeToFirstTokenMillis ()Ljava/lang/Long;
+	public final fun getTokensPerSecond ()Ljava/lang/Double;
+	public final fun getTotalTokens ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/avinash006/pocketinferencekit/core/HistoryTrimmer {
+	public static final field Companion Lio/github/avinash006/pocketinferencekit/core/HistoryTrimmer$Companion;
+	public abstract fun trim (Ljava/util/List;)Ljava/util/List;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/HistoryTrimmer$Companion {
+	public final fun getDropOldest ()Lio/github/avinash006/pocketinferencekit/core/HistoryTrimmer;
+}
+
+public abstract interface class io/github/avinash006/pocketinferencekit/core/LocalLMEngine : java/lang/AutoCloseable {
+	public abstract fun awaitClosed (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun close ()V
+	public abstract fun getActiveBackend ()Lio/github/avinash006/pocketinferencekit/core/Backend;
+	public abstract fun newChat (Ljava/lang/String;Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;Ljava/util/List;Lio/github/avinash006/pocketinferencekit/core/HistoryTrimmer;Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;)Lio/github/avinash006/pocketinferencekit/core/ChatSession;
+	public static synthetic fun newChat$default (Lio/github/avinash006/pocketinferencekit/core/LocalLMEngine;Ljava/lang/String;Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;Ljava/util/List;Lio/github/avinash006/pocketinferencekit/core/HistoryTrimmer;Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/ChatSession;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMEngine$DefaultImpls {
+	public static synthetic fun newChat$default (Lio/github/avinash006/pocketinferencekit/core/LocalLMEngine;Ljava/lang/String;Lio/github/avinash006/pocketinferencekit/core/GenerationConfig;Ljava/util/List;Lio/github/avinash006/pocketinferencekit/core/HistoryTrimmer;Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/ChatSession;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/PocketInferenceKit {
+	public static final field INSTANCE Lio/github/avinash006/pocketinferencekit/core/PocketInferenceKit;
+	public final fun load (Landroid/content/Context;Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lio/github/avinash006/pocketinferencekit/core/EngineConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun load$default (Lio/github/avinash006/pocketinferencekit/core/PocketInferenceKit;Landroid/content/Context;Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lio/github/avinash006/pocketinferencekit/core/EngineConfig;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/ToolRegistry {
+	public static final field Companion Lio/github/avinash006/pocketinferencekit/core/ToolRegistry$Companion;
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/ToolRegistry$Builder {
+	public final fun register (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/jvm/functions/Function2;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/ToolRegistry$Companion {
+	public final fun build (ILkotlin/jvm/functions/Function1;)Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;
+	public static synthetic fun build$default (Lio/github/avinash006/pocketinferencekit/core/ToolRegistry$Companion;ILkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;
+	public final fun getEmpty ()Lio/github/avinash006/pocketinferencekit/core/ToolRegistry;
+}
+

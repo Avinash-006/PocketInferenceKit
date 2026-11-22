@@ -60,13 +60,14 @@ internal class SampleViewModel(
     private val downloads = DownloadManager(application)
     private val cache = ModelCache(application)
     private val preferences = application.getSharedPreferences("sample_chat", Context.MODE_PRIVATE)
-    private val mutableState = MutableStateFlow(
-        SampleState(
-            selected = ModelCatalog.entries.find { it.id == saved.get<String>(SELECTED) } ?: ModelCatalog.Qwen3_0_6B,
-            wifiOnly = saved[WIFI] ?: false,
-            draft = saved[DRAFT] ?: "",
-        ),
-    )
+    private val mutableState =
+        MutableStateFlow(
+            SampleState(
+                selected = ModelCatalog.entries.find { it.id == saved.get<String>(SELECTED) } ?: ModelCatalog.Qwen3_0_6B,
+                wifiOnly = saved[WIFI] ?: false,
+                draft = saved[DRAFT] ?: "",
+            ),
+        )
     val state = mutableState.asStateFlow()
 
     private var monitor: Job? = null
@@ -102,13 +103,14 @@ internal class SampleViewModel(
 
     fun cancel() = modelAction(downloads::cancel)
 
-    fun delete() = modelAction { model ->
-        if (!cache.delete(model)) {
-            mutableState.update { it.copy(error = "The file is in use or is no longer installed.") }
+    fun delete() =
+        modelAction { model ->
+            if (!cache.delete(model)) {
+                mutableState.update { it.copy(error = "The file is in use or is no longer installed.") }
+            }
+            refreshCache()
+            observeSelected()
         }
-        refreshCache()
-        observeSelected()
-    }
 
     fun openChat() = open(toolMode = false)
 
@@ -119,54 +121,57 @@ internal class SampleViewModel(
         val snapshot = state.value
         val model = snapshot.selected
         mutableState.update { it.copy(loading = true, error = null) }
-        loading = viewModelScope.launch {
-            var opened: LocalLMEngine? = null
-            try {
-                closingEngine?.awaitClosed()
-                closingEngine = null
-                val history = withContext(Dispatchers.IO) { loadHistory(model, toolMode) }
-                if (model.sha256 !in snapshot.installed && snapshot.download !is DownloadState.Paused) {
-                    downloads.start(model, snapshot.wifiOnly)
+        loading =
+            viewModelScope.launch {
+                var opened: LocalLMEngine? = null
+                try {
+                    closingEngine?.awaitClosed()
+                    closingEngine = null
+                    val history = withContext(Dispatchers.IO) { loadHistory(model, toolMode) }
+                    if (model.sha256 !in snapshot.installed && snapshot.download !is DownloadState.Paused) {
+                        downloads.start(model, snapshot.wifiOnly)
+                    }
+                    val active = PocketInferenceKit.load(application, model)
+                    opened = active
+                    currentCoroutineContext().ensureActive()
+                    val instruction =
+                        if (toolMode) {
+                            "Use the registered clock and calculator tools when relevant. Keep answers concise."
+                        } else {
+                            "You are a helpful assistant. Keep answers concise."
+                        }
+                    val chat =
+                        active.newChat(
+                            instruction,
+                            history = history,
+                            tools = if (toolMode) sampleTools else ToolRegistry.Empty,
+                        )
+                    engine = active
+                    session = chat
+                    opened = null
+                    saved[CHAT] = true
+                    saved[TOOLS] = toolMode
+                    mutableState.update {
+                        it.copy(
+                            chatOpen = true,
+                            toolMode = toolMode,
+                            toolCalls = emptyList(),
+                            messages = history,
+                            loading = false,
+                            backend = active.activeBackend,
+                            stats = null,
+                        )
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    saved[CHAT] = false
+                    showError(error)
+                } finally {
+                    opened?.close()
+                    mutableState.update { it.copy(loading = false) }
                 }
-                val active = PocketInferenceKit.load(application, model)
-                opened = active
-                currentCoroutineContext().ensureActive()
-                val instruction = if (toolMode) {
-                    "Use the registered clock and calculator tools when relevant. Keep answers concise."
-                } else {
-                    "You are a helpful assistant. Keep answers concise."
-                }
-                val chat = active.newChat(
-                    instruction,
-                    history = history,
-                    tools = if (toolMode) sampleTools else ToolRegistry.Empty,
-                )
-                engine = active
-                session = chat
-                opened = null
-                saved[CHAT] = true
-                saved[TOOLS] = toolMode
-                mutableState.update {
-                    it.copy(
-                        chatOpen = true,
-                        toolMode = toolMode,
-                        toolCalls = emptyList(),
-                        messages = history,
-                        loading = false,
-                        backend = active.activeBackend,
-                        stats = null,
-                    )
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                saved[CHAT] = false
-                showError(error)
-            } finally {
-                opened?.close()
-                mutableState.update { it.copy(loading = false) }
             }
-        }
     }
 
     fun backToModels() {
@@ -190,38 +195,47 @@ internal class SampleViewModel(
         if (prompt.isBlank() || generation?.isActive == true) return
         setDraft("")
         mutableState.update { it.copy(pendingPrompt = prompt, streaming = "", error = null, toolCalls = emptyList()) }
-        generation = viewModelScope.launch {
-            var finished = false
-            val text = StringBuilder()
-            try {
-                chat.send(prompt).collect { event ->
-                    when (event) {
-                        is GenerationEvent.Token -> {
-                            text.append(event.text)
-                            mutableState.update { it.copy(streaming = text.toString()) }
+        generation =
+            viewModelScope.launch {
+                var finished = false
+                val text = StringBuilder()
+                try {
+                    chat.send(prompt).collect { event ->
+                        when (event) {
+                            is GenerationEvent.Token -> {
+                                text.append(event.text)
+                                mutableState.update { it.copy(streaming = text.toString()) }
+                            }
+
+                            is GenerationEvent.ToolCall -> {
+                                mutableState.update { it.copy(toolCalls = it.toolCalls + event.name) }
+                            }
+
+                            is GenerationEvent.Finished -> {
+                                val messages =
+                                    (
+                                        snapshot.messages + ChatMessage(ChatRole.User, prompt) +
+                                            ChatMessage(ChatRole.Assistant, text.toString())
+                                    ).takeLast(MAX_HISTORY)
+                                finished = true
+                                mutableState.update { it.copy(messages = messages, stats = event.stats, pendingPrompt = null, streaming = "") }
+                                withContext(Dispatchers.IO) { saveHistory(snapshot.selected, snapshot.toolMode, messages) }
+                            }
+
+                            is GenerationEvent.Error -> {
+                                throw event.exception
+                            }
                         }
-                        is GenerationEvent.ToolCall -> {
-                            mutableState.update { it.copy(toolCalls = it.toolCalls + event.name) }
-                        }
-                        is GenerationEvent.Finished -> {
-                            val messages = (snapshot.messages + ChatMessage(ChatRole.User, prompt) +
-                                ChatMessage(ChatRole.Assistant, text.toString())).takeLast(MAX_HISTORY)
-                            finished = true
-                            mutableState.update { it.copy(messages = messages, stats = event.stats, pendingPrompt = null, streaming = "") }
-                            withContext(Dispatchers.IO) { saveHistory(snapshot.selected, snapshot.toolMode, messages) }
-                        }
-                        is GenerationEvent.Error -> throw event.exception
                     }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    showError(error)
+                } finally {
+                    if (!finished && state.value.draft.isEmpty()) setDraft(prompt)
+                    mutableState.update { it.copy(pendingPrompt = null, streaming = "") }
                 }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                showError(error)
-            } finally {
-                if (!finished && state.value.draft.isEmpty()) setDraft(prompt)
-                mutableState.update { it.copy(pendingPrompt = null, streaming = "") }
             }
-        }
     }
 
     fun stop() {
@@ -249,12 +263,13 @@ internal class SampleViewModel(
     private fun observeSelected() {
         val model = state.value.selected
         monitor?.cancel()
-        monitor = viewModelScope.launch {
-            downloads.progress(model).collect { download ->
-                mutableState.update { it.copy(download = download) }
-                if (download is DownloadState.Completed) refreshCache()
+        monitor =
+            viewModelScope.launch {
+                downloads.progress(model).collect { download ->
+                    mutableState.update { it.copy(download = download) }
+                    if (download is DownloadState.Completed) refreshCache()
+                }
             }
-        }
     }
 
     private fun refreshCache() {
@@ -287,7 +302,10 @@ internal class SampleViewModel(
         mutableState.update { it.copy(error = error.message ?: "The operation failed. Try again.") }
     }
 
-    private fun loadHistory(model: ModelSpec, toolMode: Boolean): List<ChatMessage> {
+    private fun loadHistory(
+        model: ModelSpec,
+        toolMode: Boolean,
+    ): List<ChatMessage> {
         val encoded = preferences.getString("history_${model.id}_$toolMode", null) ?: return emptyList()
         val messages = JSONArray(encoded)
         return List(messages.length()) { index ->
@@ -298,7 +316,11 @@ internal class SampleViewModel(
 
     // Check the synchronous commit result. The edit KTX helper returns Unit.
     @SuppressLint("UseKtx")
-    private fun saveHistory(model: ModelSpec, toolMode: Boolean, messages: List<ChatMessage>) {
+    private fun saveHistory(
+        model: ModelSpec,
+        toolMode: Boolean,
+        messages: List<ChatMessage>,
+    ) {
         val encoded = JSONArray()
         for (message in messages) {
             encoded.put(JSONObject().put("role", message.role.name).put("text", message.text.take(MAX_MESSAGE_CHARS)))

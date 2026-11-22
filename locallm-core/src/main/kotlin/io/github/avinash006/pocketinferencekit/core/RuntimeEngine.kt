@@ -29,23 +29,43 @@ internal interface NativeEngine : AutoCloseable {
 }
 
 internal interface NativeConversation : AutoCloseable {
-    fun stream(input: ConversationInput, maxOutputTokens: Int?): Flow<ConversationOutput>
+    fun stream(
+        input: ConversationInput,
+        maxOutputTokens: Int?,
+    ): Flow<ConversationOutput>
+
     fun measurements(): DecodeMeasurements? = null
 }
 
 internal sealed interface ConversationInput {
-    data class Prompt(val text: String) : ConversationInput
-    data class ToolResults(val results: List<ToolResult>) : ConversationInput
+    data class Prompt(
+        val text: String,
+    ) : ConversationInput
+
+    data class ToolResults(
+        val results: List<ToolResult>,
+    ) : ConversationInput
 }
 
 internal sealed interface ConversationOutput {
-    data class Text(val text: String) : ConversationOutput
-    data class ToolCall(val call: StructuredToolCall) : ConversationOutput
+    data class Text(
+        val text: String,
+    ) : ConversationOutput
+
+    data class ToolCall(
+        val call: StructuredToolCall,
+    ) : ConversationOutput
 }
 
-internal data class ToolResult(val name: String, val value: JsonElement)
+internal data class ToolResult(
+    val name: String,
+    val value: JsonElement,
+)
 
-internal data class DecodeMeasurements(val tokens: Int, val tokensPerSecond: Double)
+internal data class DecodeMeasurements(
+    val tokens: Int,
+    val tokensPerSecond: Double,
+)
 
 internal class RuntimeEngine(
     override val activeBackend: Backend,
@@ -67,40 +87,44 @@ internal class RuntimeEngine(
         history: List<ChatMessage>,
         historyTrimmer: HistoryTrimmer,
         tools: ToolRegistry,
-    ): ChatSession = synchronized(stateLock) {
-        if (closing) throw LocalLMException.Cancelled("The inference engine is closed.")
-        RuntimeChat(
-            engine = this,
-            systemPrompt = systemPrompt,
-            config = generationConfig.copy(stopSequences = generationConfig.stopSequences.toList()),
-            history = history.toList(),
-            historyTrimmer = historyTrimmer,
-            tools = tools,
-            dispatcher = dispatcher,
-            monotonicNanos = monotonicNanos,
-        ).also(sessions::add)
-    }
-
-    suspend fun <T> withNative(block: suspend (NativeEngine) -> T): T = nativeLock.withLock {
-        if (synchronized(stateLock) { closing }) {
-            throw LocalLMException.Cancelled("The inference engine is closed.")
+    ): ChatSession =
+        synchronized(stateLock) {
+            if (closing) throw LocalLMException.Cancelled("The inference engine is closed.")
+            RuntimeChat(
+                engine = this,
+                systemPrompt = systemPrompt,
+                config = generationConfig.copy(stopSequences = generationConfig.stopSequences.toList()),
+                history = history.toList(),
+                historyTrimmer = historyTrimmer,
+                tools = tools,
+                dispatcher = dispatcher,
+                monotonicNanos = monotonicNanos,
+            ).also(sessions::add)
         }
-        block(native)
-    }
+
+    suspend fun <T> withNative(block: suspend (NativeEngine) -> T): T =
+        nativeLock.withLock {
+            if (synchronized(stateLock) { closing }) {
+                throw LocalLMException.Cancelled("The inference engine is closed.")
+            }
+            block(native)
+        }
 
     fun remove(session: RuntimeChat) {
         synchronized(stateLock) { sessions.remove(session) }
     }
 
     override fun close() {
-        val snapshot = synchronized(stateLock) {
-            if (closing) return
-            closing = true
-            sessions.toList()
-        }
+        val snapshot =
+            synchronized(stateLock) {
+                if (closing) return
+                closing = true
+                sessions.toList()
+            }
         snapshot.forEach(RuntimeChat::close)
         CoroutineScope(dispatcher).launch {
             val failures = mutableListOf<LocalLMException>()
+
             fun release(block: () -> Unit) {
                 try {
                     block()
@@ -152,101 +176,107 @@ internal class RuntimeChat(
     private var closing = false
     private var teardownFailure: LocalLMException? = null
 
-    override fun send(prompt: String): Flow<GenerationEvent> = channelFlow {
-        val job = currentCoroutineContext().job
-        val rejection = synchronized(stateLock) {
-            when {
-                closing -> LocalLMException.Cancelled("This chat is closed.")
-                turn != null -> LocalLMException.ConcurrentGeneration()
-                else -> {
-                    turn = job
-                    null
-                }
-            }
-        }
-        if (rejection != null) {
-            send(GenerationEvent.Error(rejection))
-            return@channelFlow
-        }
-
-        try {
-            require(prompt.isNotBlank()) { "The prompt must contain text." }
-            val history = historyTrimmer.trim(transcript).toList()
-            val output = StringBuilder()
-            val start = monotonicNanos()
-            var firstTokenMillis: Long? = null
-            val filter = StopSequenceFilter(config.stopSequences)
-            suspend fun emitText(text: String) {
-                if (text.isEmpty()) return
-                if (firstTokenMillis == null) firstTokenMillis = (monotonicNanos() - start) / 1_000_000
-                output.append(text)
-                send(GenerationEvent.Token(text))
-            }
-
-            val decode = engine.withNative { native ->
-                val conversation = native.openConversation(systemPrompt, history, config, tools)
-                var generationError: Throwable? = null
-                try {
-                    runTurn(conversation, prompt, filter, ::emitText) { name, arguments ->
-                        send(GenerationEvent.ToolCall(name, arguments))
-                    }
-                } catch (error: Throwable) {
-                    generationError = error
-                    throw error
-                } finally {
-                    try {
-                        conversation.close()
-                    } catch (error: Throwable) {
-                        val failure = error.generationFailure()
-                        synchronized(stateLock) {
-                            if (teardownFailure == null) teardownFailure = failure
+    override fun send(prompt: String): Flow<GenerationEvent> =
+        channelFlow {
+            val job = currentCoroutineContext().job
+            val rejection =
+                synchronized(stateLock) {
+                    when {
+                        closing -> {
+                            LocalLMException.Cancelled("This chat is closed.")
                         }
-                        if (generationError == null) throw failure
-                        if (generationError !== failure) generationError.addSuppressed(failure)
+
+                        turn != null -> {
+                            LocalLMException.ConcurrentGeneration()
+                        }
+
+                        else -> {
+                            turn = job
+                            null
+                        }
                     }
                 }
+            if (rejection != null) {
+                send(GenerationEvent.Error(rejection))
+                return@channelFlow
             }
 
-            currentCoroutineContext().ensureActive()
-            transcript = history + ChatMessage(ChatRole.User, prompt) +
-                ChatMessage(ChatRole.Assistant, output.toString())
-            send(GenerationEvent.Finished(GenerationStats(firstTokenMillis, decode?.tokensPerSecond, decode?.tokens)))
-        } catch (error: java.util.concurrent.CancellationException) {
-            currentCoroutineContext().ensureActive()
-            send(GenerationEvent.Error(error.generationFailure()))
-        } catch (error: Exception) {
-            send(GenerationEvent.Error(error.generationFailure()))
-        } catch (error: OutOfMemoryError) {
-            send(GenerationEvent.Error(error.generationFailure()))
-        } catch (error: LinkageError) {
-            send(GenerationEvent.Error(error.generationFailure()))
-        } finally {
-            val isClosed = synchronized(stateLock) {
-                turn = null
-                closing
-            }
-            if (isClosed) completeClose()
-        }
-    }.flowOn(dispatcher).catch { error ->
-        if (error is SessionClosedCancellation) {
-            emit(GenerationEvent.Error(LocalLMException.Cancelled("This chat was closed during generation.", error)))
-        } else {
-            throw error
-        }
-    }
+            try {
+                require(prompt.isNotBlank()) { "The prompt must contain text." }
+                val history = historyTrimmer.trim(transcript).toList()
+                val output = StringBuilder()
+                val start = monotonicNanos()
+                var firstTokenMillis: Long? = null
+                val filter = StopSequenceFilter(config.stopSequences)
 
-    override fun sendText(prompt: String): Flow<String> = flow {
-        send(prompt).collect { event ->
-            when (event) {
-                is GenerationEvent.Token -> emit(event.text)
-                is GenerationEvent.Error -> throw event.exception
-                is GenerationEvent.Finished, is GenerationEvent.ToolCall -> Unit
+                suspend fun emitText(text: String) {
+                    if (text.isEmpty()) return
+                    if (firstTokenMillis == null) firstTokenMillis = (monotonicNanos() - start) / 1_000_000
+                    output.append(text)
+                    send(GenerationEvent.Token(text))
+                }
+
+                val decode =
+                    engine.withNative { native ->
+                        val conversation = native.openConversation(systemPrompt, history, config, tools)
+                        val response =
+                            runCatching {
+                                runTurn(conversation, prompt, filter, ::emitText) { name, arguments ->
+                                    send(GenerationEvent.ToolCall(name, arguments))
+                                }
+                            }
+                        val closeFailure = runCatching(conversation::close).exceptionOrNull()?.generationFailure()
+                        if (closeFailure != null) {
+                            synchronized(stateLock) {
+                                if (teardownFailure == null) teardownFailure = closeFailure
+                            }
+                            val generationFailure = response.exceptionOrNull() ?: throw closeFailure
+                            if (generationFailure !== closeFailure) generationFailure.addSuppressed(closeFailure)
+                        }
+                        response.getOrThrow()
+                    }
+
+                currentCoroutineContext().ensureActive()
+                transcript = history + ChatMessage(ChatRole.User, prompt) +
+                    ChatMessage(ChatRole.Assistant, output.toString())
+                send(GenerationEvent.Finished(GenerationStats(firstTokenMillis, decode?.tokensPerSecond, decode?.tokens)))
+            } catch (error: java.util.concurrent.CancellationException) {
+                currentCoroutineContext().ensureActive()
+                send(GenerationEvent.Error(error.generationFailure()))
+            } catch (error: Exception) {
+                send(GenerationEvent.Error(error.generationFailure()))
+            } catch (error: OutOfMemoryError) {
+                send(GenerationEvent.Error(error.generationFailure()))
+            } catch (error: LinkageError) {
+                send(GenerationEvent.Error(error.generationFailure()))
+            } finally {
+                val isClosed =
+                    synchronized(stateLock) {
+                        turn = null
+                        closing
+                    }
+                if (isClosed) completeClose()
+            }
+        }.flowOn(dispatcher).catch { error ->
+            if (error is SessionClosedCancellation) {
+                emit(GenerationEvent.Error(LocalLMException.Cancelled("This chat was closed during generation.", error)))
+            } else {
+                throw error
             }
         }
-    }
 
-    override suspend fun sendAndAwait(prompt: String): String =
-        buildString { sendText(prompt).collect { append(it) } }
+    override fun sendText(prompt: String): Flow<String> =
+        flow {
+            send(prompt).collect { event ->
+                when (event) {
+                    is GenerationEvent.Token -> emit(event.text)
+                    is GenerationEvent.Error -> throw event.exception
+                    is GenerationEvent.Finished, is GenerationEvent.ToolCall -> Unit
+                }
+            }
+        }
+
+    override suspend fun sendAndAwait(prompt: String): String = buildString { sendText(prompt).collect { append(it) } }
 
     private suspend fun runTurn(
         conversation: NativeConversation,
@@ -263,18 +293,23 @@ internal class RuntimeChat(
         var allStepsMeasured = true
         while (true) {
             val calls = mutableListOf<StructuredToolCall>()
-            conversation.stream(input, remaining).takeWhile { output ->
-                when (output) {
-                    is ConversationOutput.Text -> emitText(filter.append(output.text))
-                    is ConversationOutput.ToolCall -> {
-                        if (calls.size >= MAX_TOOL_CALLS_PER_ROUND) {
-                            throw LocalLMException.ToolExecutionFailed("The model requested too many tools in one round.")
+            conversation
+                .stream(input, remaining)
+                .takeWhile { output ->
+                    when (output) {
+                        is ConversationOutput.Text -> {
+                            emitText(filter.append(output.text))
                         }
-                        calls += output.call
+
+                        is ConversationOutput.ToolCall -> {
+                            if (calls.size >= MAX_TOOL_CALLS_PER_ROUND) {
+                                throw LocalLMException.ToolExecutionFailed("The model requested too many tools in one round.")
+                            }
+                            calls += output.call
+                        }
                     }
-                }
-                !filter.stopped
-            }.collect()
+                    !filter.stopped
+                }.collect()
             if (filter.stopped) return null
             val step = conversation.measurements()
             if (step == null) {
@@ -299,28 +334,31 @@ internal class RuntimeChat(
                 throw LocalLMException.GenerationFailed("The response token budget ended before the model could continue.")
             }
             val prepared = calls.map(tools::prepare)
-            val results = prepared.map { (registration, arguments) ->
-                onToolCall(registration.name, arguments)
-                val value = try {
-                    registration.execute(arguments).also { it.checkToolJsonBounds() }
-                } catch (error: java.util.concurrent.CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    throw LocalLMException.ToolExecutionFailed("Tool '${registration.name}' could not complete.", error)
+            val results =
+                prepared.map { (registration, arguments) ->
+                    onToolCall(registration.name, arguments)
+                    val value =
+                        try {
+                            registration.execute(arguments).also { it.checkToolJsonBounds() }
+                        } catch (error: java.util.concurrent.CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            throw LocalLMException.ToolExecutionFailed("Tool '${registration.name}' could not complete.", error)
+                        }
+                    ToolResult(registration.name, value)
                 }
-                ToolResult(registration.name, value)
-            }
             input = ConversationInput.ToolResults(results)
             rounds++
         }
     }
 
     override fun close() {
-        val job = synchronized(stateLock) {
-            if (closing) return
-            closing = true
-            turn
-        }
+        val job =
+            synchronized(stateLock) {
+                if (closing) return
+                closing = true
+                turn
+            }
         if (job == null) completeClose() else job.cancel(SessionClosedCancellation())
     }
 

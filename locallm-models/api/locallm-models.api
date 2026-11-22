@@ -1,0 +1,207 @@
+public abstract class io/github/avinash006/pocketinferencekit/core/LocalLMException : java/lang/RuntimeException {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$BackendInitFailed : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$Cancelled : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$ChecksumMismatch : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getModelId ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$ConcurrentGeneration : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> ()V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$DownloadFailed : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$GenerationFailed : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$InsufficientStorage : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$ModelNotFound : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getModelId ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$OutOfMemory : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/Throwable;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$ToolExecutionFailed : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/core/LocalLMException$UnsupportedDevice : io/github/avinash006/pocketinferencekit/core/LocalLMException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/CachedModel {
+	public fun <init> (Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun copy (Ljava/lang/String;J)Lio/github/avinash006/pocketinferencekit/models/CachedModel;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/CachedModel;Ljava/lang/String;JILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/CachedModel;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSha256 ()Ljava/lang/String;
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadManager {
+	public static final field CANCELLED Ljava/lang/String;
+	public static final field PAUSED Ljava/lang/String;
+	public static final field WIFI_SUFFIX Ljava/lang/String;
+	public fun <init> (Landroid/content/Context;)V
+	public final fun cancel (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun pause (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun progress (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;)Lkotlinx/coroutines/flow/Flow;
+	public final fun resume (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun start (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun start$default (Lio/github/avinash006/pocketinferencekit/models/DownloadManager;Lio/github/avinash006/pocketinferencekit/models/ModelSpec;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/avinash006/pocketinferencekit/models/DownloadState {
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Cancelled : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public static final field INSTANCE Lio/github/avinash006/pocketinferencekit/models/DownloadState$Cancelled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Completed : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public static final field INSTANCE Lio/github/avinash006/pocketinferencekit/models/DownloadState$Completed;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Failed : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public fun <init> (Lio/github/avinash006/pocketinferencekit/core/LocalLMException;)V
+	public final fun component1 ()Lio/github/avinash006/pocketinferencekit/core/LocalLMException;
+	public final fun copy (Lio/github/avinash006/pocketinferencekit/core/LocalLMException;)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Failed;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/DownloadState$Failed;Lio/github/avinash006/pocketinferencekit/core/LocalLMException;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getException ()Lio/github/avinash006/pocketinferencekit/core/LocalLMException;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Idle : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public static final field INSTANCE Lio/github/avinash006/pocketinferencekit/models/DownloadState$Idle;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Paused : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Paused;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/DownloadState$Paused;JJILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Paused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceivedBytes ()J
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Running : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Running;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/DownloadState$Running;JJILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceivedBytes ()J
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/DownloadState$Waiting : io/github/avinash006/pocketinferencekit/models/DownloadState {
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Waiting;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/DownloadState$Waiting;JJILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/DownloadState$Waiting;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReceivedBytes ()J
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/ModelCache {
+	public fun <init> (Landroid/content/Context;)V
+	public final fun delete (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun importModel (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Landroid/net/Uri;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun importModel (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun list (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun size (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/ModelCatalog {
+	public static final field INSTANCE Lio/github/avinash006/pocketinferencekit/models/ModelCatalog;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getQwen2_5_1_5B ()Lio/github/avinash006/pocketinferencekit/models/ModelSpec;
+	public final fun getQwen3_0_6B ()Lio/github/avinash006/pocketinferencekit/models/ModelSpec;
+	public final fun getQwen3_5_0_8B ()Lio/github/avinash006/pocketinferencekit/models/ModelSpec;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/ModelFormat : java/lang/Enum {
+	public static final field LiteRtLm Lio/github/avinash006/pocketinferencekit/models/ModelFormat;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/models/ModelFormat;
+	public static fun values ()[Lio/github/avinash006/pocketinferencekit/models/ModelFormat;
+}
+
+public final class io/github/avinash006/pocketinferencekit/models/ModelSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Lio/github/avinash006/pocketinferencekit/models/ModelFormat;Ljava/lang/Integer;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()J
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lio/github/avinash006/pocketinferencekit/models/ModelFormat;
+	public final fun component7 ()Ljava/lang/Integer;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Lio/github/avinash006/pocketinferencekit/models/ModelFormat;Ljava/lang/Integer;Ljava/lang/String;)Lio/github/avinash006/pocketinferencekit/models/ModelSpec;
+	public static synthetic fun copy$default (Lio/github/avinash006/pocketinferencekit/models/ModelSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Lio/github/avinash006/pocketinferencekit/models/ModelFormat;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)Lio/github/avinash006/pocketinferencekit/models/ModelSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getFormat ()Lio/github/avinash006/pocketinferencekit/models/ModelFormat;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLicense ()Ljava/lang/String;
+	public final fun getMinRamMb ()Ljava/lang/Integer;
+	public final fun getSha256 ()Ljava/lang/String;
+	public final fun getSizeBytes ()J
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

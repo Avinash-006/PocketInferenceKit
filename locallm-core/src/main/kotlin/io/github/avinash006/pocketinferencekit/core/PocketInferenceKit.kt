@@ -10,12 +10,12 @@ import io.github.avinash006.pocketinferencekit.models.DownloadManager
 import io.github.avinash006.pocketinferencekit.models.ModelCache
 import io.github.avinash006.pocketinferencekit.models.ModelLease
 import io.github.avinash006.pocketinferencekit.models.ModelSpec
-import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** Entry point for loading a verified model. Calls may run concurrently. */
 public object PocketInferenceKit {
@@ -54,20 +54,22 @@ public object PocketInferenceKit {
                     throw LocalLMException.BackendInitFailed("Could not prepare the inference cache directory.")
                 }
 
-                val (selectedBackend, selectedRuntime) = selectBackend(
-                    config.preferredBackend,
-                    onFallback = { backend, failure ->
-                        Log.w("PocketInferenceKit", "$backend initialization failed (${failure.javaClass.simpleName}). Trying fallback.")
-                    },
-                ) { backend ->
-                    LiteRtRuntime.open(
-                        lease.file.absolutePath,
-                        cache.absolutePath,
-                        backend,
-                        config.contextLength ?: config.maxTokens,
-                        config.npuLibraryDirectory ?: app.applicationInfo.nativeLibraryDir,
-                    )
-                }
+                val (selectedBackend, selectedRuntime) =
+                    selectBackend(
+                        config.preferredBackend,
+                        onFallback = { backend, failure ->
+                            val status = backendStatus.find(failure.message.orEmpty())?.value ?: failure.javaClass.simpleName
+                            Log.w("PocketInferenceKit", "$backend initialization failed ($status). Trying fallback.")
+                        },
+                    ) { backend ->
+                        LiteRtRuntime.open(
+                            lease.file.absolutePath,
+                            cache.absolutePath,
+                            backend,
+                            config.contextLength ?: config.maxTokens,
+                            config.npuLibraryDirectory ?: app.applicationInfo.nativeLibraryDir,
+                        )
+                    }
                 runtime = selectedRuntime
                 if (config.warmup) {
                     selectedRuntime.openConversation(null, emptyList(), GenerationConfig(maxNewTokens = 1)).use {
@@ -75,13 +77,14 @@ public object PocketInferenceKit {
                     }
                 }
                 var callbacks: ComponentCallbacks2? = null
-                val engine = RuntimeEngine(
-                    selectedBackend,
-                    selectedRuntime,
-                    dispatcher,
-                    unregisterCallbacks = { callbacks?.let(app::unregisterComponentCallbacks) },
-                    releaseModel = lease::close,
-                )
+                val engine =
+                    RuntimeEngine(
+                        selectedBackend,
+                        selectedRuntime,
+                        dispatcher,
+                        unregisterCallbacks = { callbacks?.let(app::unregisterComponentCallbacks) },
+                        releaseModel = lease::close,
+                    )
                 managed = engine
                 if (config.unloadOnLowMemory) {
                     callbacks = MemoryCallbacks(engine)
@@ -90,23 +93,7 @@ public object PocketInferenceKit {
                 engine
             }
         } catch (error: Throwable) {
-            withContext(NonCancellable + dispatcher) {
-                try {
-                    val initialized = managed
-                    if (initialized == null) {
-                        try {
-                            runtime?.close()
-                        } finally {
-                            modelLease?.close()
-                        }
-                    } else {
-                        initialized.close()
-                        initialized.awaitClosed()
-                    }
-                } catch (releaseError: Throwable) {
-                    if (releaseError !== error) error.addSuppressed(releaseError)
-                }
-            }
+            releaseFailedLoad(dispatcher, managed, runtime, modelLease, error)
             throw when (error) {
                 is LocalLMException, is java.util.concurrent.CancellationException -> error
                 is OutOfMemoryError -> LocalLMException.OutOfMemory(error)
@@ -118,16 +105,45 @@ public object PocketInferenceKit {
     }
 }
 
+private suspend fun releaseFailedLoad(
+    dispatcher: CoroutineDispatcher,
+    managed: RuntimeEngine?,
+    runtime: NativeEngine?,
+    modelLease: ModelLease?,
+    failure: Throwable,
+) {
+    withContext(NonCancellable + dispatcher) {
+        try {
+            if (managed == null) {
+                try {
+                    runtime?.close()
+                } finally {
+                    modelLease?.close()
+                }
+            } else {
+                managed.close()
+                managed.awaitClosed()
+            }
+        } catch (releaseError: Throwable) {
+            if (releaseError !== failure) failure.addSuppressed(releaseError)
+        }
+    }
+}
+
+private val backendStatus =
+    Regex("\\b(?:UNIMPLEMENTED|UNAVAILABLE|FAILED_PRECONDITION|RESOURCE_EXHAUSTED|INVALID_ARGUMENT|INTERNAL)\\b")
+
 internal fun <T> selectBackend(
     preference: Backend,
     onFallback: (Backend, Throwable) -> Unit,
     initialize: (Backend) -> T,
 ): Pair<Backend, T> {
-    val candidates = when (preference) {
-        Backend.Auto, Backend.GPU -> listOf(Backend.GPU, Backend.CPU)
-        Backend.CPU -> listOf(Backend.CPU)
-        Backend.NPU -> listOf(Backend.NPU, Backend.GPU, Backend.CPU)
-    }
+    val candidates =
+        when (preference) {
+            Backend.Auto, Backend.GPU -> listOf(Backend.GPU, Backend.CPU)
+            Backend.CPU -> listOf(Backend.CPU)
+            Backend.NPU -> listOf(Backend.NPU, Backend.GPU, Backend.CPU)
+        }
     val failures = mutableListOf<Exception>()
     for (candidate in candidates) {
         try {
@@ -137,16 +153,19 @@ internal fun <T> selectBackend(
             if (candidate != candidates.last()) onFallback(candidate, error)
         }
     }
-    val failure = LocalLMException.BackendInitFailed(
-        "Could not initialize the model on ${candidates.joinToString()}. Check model and device compatibility.",
-        failures.last(),
-    )
+    val failure =
+        LocalLMException.BackendInitFailed(
+            "Could not initialize the model on ${candidates.joinToString()}. Check model and device compatibility.",
+            failures.last(),
+        )
     failures.dropLast(1).forEach(failure::addSuppressed)
     throw failure
 }
 
 @Suppress("DEPRECATION")
-private class MemoryCallbacks(private val engine: LocalLMEngine) : ComponentCallbacks2 {
+private class MemoryCallbacks(
+    private val engine: LocalLMEngine,
+) : ComponentCallbacks2 {
     override fun onConfigurationChanged(newConfig: Configuration) = Unit
 
     @Deprecated("Android no longer delivers this callback on recent versions.")

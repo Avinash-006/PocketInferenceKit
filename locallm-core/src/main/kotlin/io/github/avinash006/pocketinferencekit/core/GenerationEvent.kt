@@ -18,14 +18,23 @@ public data class GenerationStats(
 /** An update from a single generation flow. */
 public sealed interface GenerationEvent {
     /** Incremental visible output in [text]. */
-    public data class Token(public val text: String) : GenerationEvent
+    public data class Token(
+        public val text: String,
+    ) : GenerationEvent
 
     /** The model requested registered tool [name] with validated [arguments]. */
-    public data class ToolCall(public val name: String, public val arguments: JsonObject) : GenerationEvent
+    public data class ToolCall(
+        public val name: String,
+        public val arguments: JsonObject,
+    ) : GenerationEvent
 
     /** Successful completion with the turn's [stats]. */
-    public data class Finished(public val stats: GenerationStats) : GenerationEvent
+    public data class Finished(
+        public val stats: GenerationStats,
+    ) : GenerationEvent
 
     /** Unsuccessful completion with an actionable [exception]. */
-    public data class Error(public val exception: LocalLMException) : GenerationEvent
+    public data class Error(
+        public val exception: LocalLMException,
+    ) : GenerationEvent
 }

@@ -1,19 +1,22 @@
 package io.github.avinash006.pocketinferencekit.models
 
 import io.github.avinash006.pocketinferencekit.core.LocalLMException
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlinx.coroutines.sync.withLock
 
 internal class RangeTransfer(
     private val store: ModelFileStore,
     private val openConnection: (URL) -> HttpURLConnection,
     private val allowInsecureForTest: Boolean = false,
 ) {
-    suspend fun download(model: ModelSpec, report: suspend (Long) -> Unit) {
+    suspend fun download(
+        model: ModelSpec,
+        report: suspend (Long) -> Unit,
+    ) {
         store.lock(model).withLock {
             val target = store.file(model)
             val partial = store.partial(model)
@@ -36,7 +39,12 @@ internal class RangeTransfer(
                     }
                     store.prepare(model.sizeBytes - offset)
                     receive(
-                        model, partial, validatorFile, offset, validator, report,
+                        model,
+                        partial,
+                        validatorFile,
+                        offset,
+                        validator,
+                        report,
                     )
                 }
                 store.verify(partial, model)
@@ -65,31 +73,40 @@ internal class RangeTransfer(
         val url = model.url ?: throw LocalLMException.ModelNotFound(model.id)
         val connection = connect(URL(url), offset, validator)
         try {
-            val responseValidator = connection.getHeaderField("ETag")?.takeUnless { it.startsWith("W/") }
-                ?: connection.getHeaderField("Last-Modified")
-            val (actualOffset, responseBytes) = when (val status = connection.responseCode) {
-                HttpURLConnection.HTTP_OK -> 0L to model.sizeBytes
-                HttpURLConnection.HTTP_PARTIAL -> {
-                    val range = CONTENT_RANGE.matchEntire(connection.getHeaderField("Content-Range").orEmpty())
-                    val end = range?.groupValues?.get(2)?.toLongOrNull()
-                    if (offset <= 0 || range?.groupValues?.get(1)?.toLongOrNull() != offset ||
-                        end == null || end !in offset until model.sizeBytes ||
-                        range.groupValues[3].toLongOrNull() != model.sizeBytes ||
-                        responseValidator != validator
-                    ) {
+            val responseValidator =
+                connection.getHeaderField("ETag")?.takeUnless { it.startsWith("W/") }
+                    ?: connection.getHeaderField("Last-Modified")
+            val (actualOffset, responseBytes) =
+                when (val status = connection.responseCode) {
+                    HttpURLConnection.HTTP_OK -> {
+                        0L to model.sizeBytes
+                    }
+
+                    HttpURLConnection.HTTP_PARTIAL -> {
+                        val range = CONTENT_RANGE.matchEntire(connection.getHeaderField("Content-Range").orEmpty())
+                        val end = range?.groupValues?.get(2)?.toLongOrNull()
+                        val startsAtOffset = offset > 0 && range?.groupValues?.get(1)?.toLongOrNull() == offset
+                        val hasValidEnd = end != null && end in offset until model.sizeBytes
+                        val hasExpectedLength = range?.groupValues?.get(3)?.toLongOrNull() == model.sizeBytes
+                        val validRange = startsAtOffset && hasValidEnd && hasExpectedLength
+                        if (!validRange || responseValidator != validator) {
+                            store.discard(partial)
+                            store.discard(validatorFile)
+                            throw IOException("The response did not match the saved model revision and byte range.")
+                        }
+                        offset to (checkNotNull(end) - offset + 1)
+                    }
+
+                    416 -> {
                         store.discard(partial)
                         store.discard(validatorFile)
-                        throw IOException("The response did not match the saved model revision and byte range.")
+                        throw IOException("The source refused the saved byte range. Retrying from byte zero is possible.")
                     }
-                    offset to (end - offset + 1)
+
+                    else -> {
+                        throw IOException("The model server returned HTTP $status.")
+                    }
                 }
-                416 -> {
-                    store.discard(partial)
-                    store.discard(validatorFile)
-                    throw IOException("The source refused the saved byte range. Retrying from byte zero is possible.")
-                }
-                else -> throw IOException("The model server returned HTTP $status.")
-            }
             store.prepare(model.sizeBytes - partial.length())
             var received = actualOffset
             if (actualOffset == 0L) {
@@ -101,11 +118,12 @@ internal class RangeTransfer(
             report(received)
             connection.inputStream.buffered().use { input ->
                 FileOutputStream(partial, true).use { output ->
-                    val copied = transferBytes(input, responseBytes) { buffer, size ->
-                        output.write(buffer, 0, size)
-                        received += size
-                        report(received)
-                    }
+                    val copied =
+                        transferBytes(input, responseBytes) { buffer, size ->
+                            output.write(buffer, 0, size)
+                            received += size
+                            report(received)
+                        }
                     output.fd.sync()
                     if (copied != responseBytes) throw IOException("The server ended the transfer early.")
                 }
@@ -115,28 +133,34 @@ internal class RangeTransfer(
         }
     }
 
-    private fun connect(initial: URL, offset: Long, validator: String?): HttpURLConnection {
+    private fun connect(
+        initial: URL,
+        offset: Long,
+        validator: String?,
+    ): HttpURLConnection {
         var url = initial
         repeat(6) {
             if (url.protocol != "https" && !(allowInsecureForTest && url.protocol == "http")) {
                 throw IOException("Model downloads and redirects must use HTTPS.")
             }
-            val connection = openConnection(url).apply {
-                instanceFollowRedirects = false
-                connectTimeout = 15_000
-                readTimeout = 15_000
-                setRequestProperty("Accept-Encoding", "identity")
-                if (offset > 0) {
-                    setRequestProperty("Range", "bytes=$offset-")
-                    setRequestProperty("If-Range", requireNotNull(validator))
+            val connection =
+                openConnection(url).apply {
+                    instanceFollowRedirects = false
+                    connectTimeout = 15_000
+                    readTimeout = 15_000
+                    setRequestProperty("Accept-Encoding", "identity")
+                    if (offset > 0) {
+                        setRequestProperty("Range", "bytes=$offset-")
+                        setRequestProperty("If-Range", requireNotNull(validator))
+                    }
                 }
-            }
-            val status = try {
-                connection.responseCode
-            } catch (error: IOException) {
-                connection.disconnect()
-                throw error
-            }
+            val status =
+                try {
+                    connection.responseCode
+                } catch (error: IOException) {
+                    connection.disconnect()
+                    throw error
+                }
             if (status !in REDIRECT_CODES) return connection
             val redirect = connection.getHeaderField("Location")
             connection.disconnect()

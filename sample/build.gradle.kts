@@ -1,10 +1,12 @@
 plugins {
     id("pocketinferencekit.android-application")
-    alias(libs.plugins.kotlin.compose)
+    id("pocketinferencekit.android-compose")
 }
 
 android {
     namespace = "io.github.avinash006.pocketinferencekit.sample"
+    packaging.jniLibs.keepDebugSymbols.add("**/liblitertlm_jni.so")
+    packaging.jniLibs.keepDebugSymbols.add("**/libandroidx.graphics.path.so")
     defaultConfig {
         applicationId = "io.github.avinash006.pocketinferencekit.sample"
         versionCode = 1
@@ -18,6 +20,7 @@ android {
 
 dependencies {
     implementation(project(":locallm-core"))
+    implementation(project(":locallm-compose"))
     implementation(libs.activity.compose)
     implementation(libs.litert.lm)
     implementation(libs.lifecycle.runtime.compose)

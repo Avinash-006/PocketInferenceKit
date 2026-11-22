@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "io.github.avinash006.pocketinferencekit.models"
+    defaultConfig.consumerProguardFiles("consumer-rules.pro")
+    buildTypes.getByName("debug").enableUnitTestCoverage = true
+    testCoverage.jacocoVersion = libs.versions.jacoco.get()
 }
 
 kotlin {

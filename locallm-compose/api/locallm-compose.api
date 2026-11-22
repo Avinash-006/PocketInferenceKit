@@ -1,0 +1,20 @@
+public final class io/github/avinash006/pocketinferencekit/compose/ChatState {
+	public static final field $stable I
+	public final fun getError ()Lio/github/avinash006/pocketinferencekit/core/LocalLMException;
+	public final fun getMessages ()Ljava/util/List;
+	public final fun getPendingPrompt ()Ljava/lang/String;
+	public final fun getResponse ()Ljava/lang/String;
+	public final fun getStats ()Lio/github/avinash006/pocketinferencekit/core/GenerationStats;
+	public final fun getToolCall ()Lio/github/avinash006/pocketinferencekit/core/GenerationEvent$ToolCall;
+	public final fun send (Ljava/lang/String;)V
+	public final fun stop ()V
+}
+
+public final class io/github/avinash006/pocketinferencekit/compose/ChatStateKt {
+	public static final fun rememberChatState (Lio/github/avinash006/pocketinferencekit/core/ChatSession;Ljava/util/List;Landroidx/compose/runtime/Composer;II)Lio/github/avinash006/pocketinferencekit/compose/ChatState;
+}
+
+public final class io/github/avinash006/pocketinferencekit/compose/DownloadProgressKt {
+	public static final fun DownloadProgress-ww6aTOc (Lio/github/avinash006/pocketinferencekit/models/DownloadState;Landroidx/compose/ui/Modifier;Landroidx/compose/ui/text/TextStyle;JLandroidx/compose/runtime/Composer;II)V
+}
+

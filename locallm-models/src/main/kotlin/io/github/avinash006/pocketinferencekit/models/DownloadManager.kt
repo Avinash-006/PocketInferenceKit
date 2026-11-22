@@ -12,8 +12,6 @@ import androidx.work.WorkManager
 import androidx.work.await
 import androidx.work.workDataOf
 import io.github.avinash006.pocketinferencekit.core.LocalLMException
-import java.io.File
-import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -26,6 +24,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.UUID
 
 /** Persistent status for one model transfer. */
 public sealed interface DownloadState {
@@ -33,13 +33,22 @@ public sealed interface DownloadState {
     public data object Idle : DownloadState
 
     /** WorkManager is waiting to run the transfer. */
-    public data class Waiting(public val receivedBytes: Long, public val sizeBytes: Long) : DownloadState
+    public data class Waiting(
+        public val receivedBytes: Long,
+        public val sizeBytes: Long,
+    ) : DownloadState
 
     /** A running download, with its byte counts. */
-    public data class Running(public val receivedBytes: Long, public val sizeBytes: Long) : DownloadState
+    public data class Running(
+        public val receivedBytes: Long,
+        public val sizeBytes: Long,
+    ) : DownloadState
 
     /** Transfer paused, with the partial file available for resume. */
-    public data class Paused(public val receivedBytes: Long, public val sizeBytes: Long) : DownloadState
+    public data class Paused(
+        public val receivedBytes: Long,
+        public val sizeBytes: Long,
+    ) : DownloadState
 
     /** A verified model is installed in the app-private cache. */
     public data object Completed : DownloadState
@@ -48,7 +57,9 @@ public sealed interface DownloadState {
     public data object Cancelled : DownloadState
 
     /** The transfer reached a terminal failure. */
-    public data class Failed(public val exception: LocalLMException) : DownloadState
+    public data class Failed(
+        public val exception: LocalLMException,
+    ) : DownloadState
 }
 
 /**
@@ -87,7 +98,10 @@ public class DownloadManager internal constructor(
         }.distinctUntilChanged().flowOn(dispatcher)
 
     /** Schedules [model] once. [wifiOnly] requires a validated Wi-Fi network. */
-    public suspend fun start(model: ModelSpec, wifiOnly: Boolean = false) {
+    public suspend fun start(
+        model: ModelSpec,
+        wifiOnly: Boolean = false,
+    ) {
         schedule(model, wifiOnly, resumePaused = false)
     }
 
@@ -111,17 +125,24 @@ public class DownloadManager internal constructor(
     public suspend fun awaitInstalled(model: ModelSpec) {
         if (withContext(dispatcher) { store.file(model).isFile }) return
         schedule(model, wifiOnly = null, resumePaused = false)
-        when (val state = progress(model).first {
-            it is DownloadState.Completed || it is DownloadState.Paused ||
-                it is DownloadState.Cancelled || it is DownloadState.Failed
-        }) {
+        when (
+            val state =
+                progress(model).first {
+                    it is DownloadState.Completed || it is DownloadState.Paused ||
+                        it is DownloadState.Cancelled || it is DownloadState.Failed
+                }
+        ) {
             DownloadState.Completed -> Unit
             is DownloadState.Failed -> throw state.exception
             else -> throw LocalLMException.Cancelled("Model download was paused or cancelled.")
         }
     }
 
-    private suspend fun schedule(model: ModelSpec, wifiOnly: Boolean?, resumePaused: Boolean) {
+    private suspend fun schedule(
+        model: ModelSpec,
+        wifiOnly: Boolean?,
+        resumePaused: Boolean,
+    ) {
         withContext(dispatcher) {
             lock(model).withLock {
                 if (store.file(model).isFile) return@withLock
@@ -129,32 +150,37 @@ public class DownloadManager internal constructor(
                 val jobKey = key(model)
                 val record = prefs.getString(jobKey, null)
                 if (record == PAUSED && !resumePaused) return@withLock
-                val current = record?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                    ?.let { work.getWorkInfoByIdFlow(it).first() }
+                val current =
+                    record
+                        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                        ?.let { work.getWorkInfoByIdFlow(it).first() }
                 if (current != null && !current.state.isFinished) return@withLock
 
                 val requireWifi = wifiOnly ?: prefs.getBoolean(jobKey + WIFI_SUFFIX, false)
-                val request = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
-                    .setConstraints(
-                        Constraints.Builder()
-                            .setRequiredNetworkType(if (requireWifi) NetworkType.UNMETERED else NetworkType.CONNECTED)
-                            .build(),
-                    )
-                    .setInputData(
-                        workDataOf(
-                            MODEL_ID to model.id,
-                            DISPLAY_NAME to model.displayName,
-                            MODEL_URL to url,
-                            SHA256 to model.sha256,
-                            SIZE_BYTES to model.sizeBytes,
-                            LICENSE to model.license,
-                            WIFI_ONLY to requireWifi,
-                        ),
-                    )
-                    .build()
+                val request =
+                    OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+                        .setConstraints(
+                            Constraints
+                                .Builder()
+                                .setRequiredNetworkType(if (requireWifi) NetworkType.UNMETERED else NetworkType.CONNECTED)
+                                .build(),
+                        ).setInputData(
+                            workDataOf(
+                                MODEL_ID to model.id,
+                                DISPLAY_NAME to model.displayName,
+                                MODEL_URL to url,
+                                SHA256 to model.sha256,
+                                SIZE_BYTES to model.sizeBytes,
+                                LICENSE to model.license,
+                                WIFI_ONLY to requireWifi,
+                            ),
+                        ).build()
 
-                if (!prefs.edit().putString(jobKey, request.id.toString())
-                        .putBoolean(jobKey + WIFI_SUFFIX, requireWifi).commit()
+                if (!prefs
+                        .edit()
+                        .putString(jobKey, request.id.toString())
+                        .putBoolean(jobKey + WIFI_SUFFIX, requireWifi)
+                        .commit()
                 ) {
                     throw LocalLMException.DownloadFailed("Could not persist the download request.")
                 }
@@ -170,7 +196,10 @@ public class DownloadManager internal constructor(
         }
     }
 
-    private suspend fun stop(model: ModelSpec, marker: String) {
+    private suspend fun stop(
+        model: ModelSpec,
+        marker: String,
+    ) {
         withContext(dispatcher) {
             lock(model).withLock {
                 if (!prefs.edit().putString(key(model), marker).commit()) {
@@ -187,17 +216,20 @@ public class DownloadManager internal constructor(
         }
     }
 
-    private fun preferenceChanges(model: ModelSpec): Flow<String?> = callbackFlow {
-        val jobKey = key(model)
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { shared, name ->
-            if (name == jobKey) trySend(shared.getString(jobKey, null))
+    private fun preferenceChanges(model: ModelSpec): Flow<String?> =
+        callbackFlow {
+            val jobKey = key(model)
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { shared, name ->
+                    if (name == jobKey) trySend(shared.getString(jobKey, null))
+                }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getString(jobKey, null))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        trySend(prefs.getString(jobKey, null))
-        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
 
     private fun lock(model: ModelSpec): Mutex = operations[(key(model).hashCode() and Int.MAX_VALUE) % operations.size]
+
     private fun key(model: ModelSpec): String = "pocketinferencekit-download-${model.sha256.lowercase()}"
 
     private companion object {

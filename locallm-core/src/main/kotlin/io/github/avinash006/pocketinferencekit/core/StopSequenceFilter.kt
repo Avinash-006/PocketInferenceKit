@@ -1,6 +1,8 @@
 package io.github.avinash006.pocketinferencekit.core
 
-internal class StopSequenceFilter(private val sequences: List<String>) {
+internal class StopSequenceFilter(
+    private val sequences: List<String>,
+) {
     private var pending = ""
     var stopped: Boolean = false
         private set
@@ -17,11 +19,12 @@ internal class StopSequenceFilter(private val sequences: List<String>) {
             return text.substring(0, stopIndex)
         }
 
-        val held = sequences.maxOf { sequence ->
-            var length = minOf(sequence.length - 1, text.length)
-            while (length > 0 && !text.regionMatches(text.length - length, sequence, 0, length)) length--
-            length
-        }
+        val held =
+            sequences.maxOf { sequence ->
+                var length = minOf(sequence.length - 1, text.length)
+                while (length > 0 && !text.regionMatches(text.length - length, sequence, 0, length)) length--
+                length
+            }
         pending = text.takeLast(held)
         return text.dropLast(held)
     }

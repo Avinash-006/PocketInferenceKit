@@ -17,7 +17,10 @@ public enum class ChatRole {
  * @property role Speaker role.
  * @property text The message body.
  */
-public data class ChatMessage(public val role: ChatRole, public val text: String)
+public data class ChatMessage(
+    public val role: ChatRole,
+    public val text: String,
+)
 
 /** Chooses the transcript entries to replay before a turn. Shared implementations must be thread-safe. */
 public fun interface HistoryTrimmer {
@@ -27,12 +30,14 @@ public fun interface HistoryTrimmer {
     /** Built-in history policies. */
     public companion object {
         /** Retains up to 16 recent complete user and assistant pairs. */
-        public val DropOldest: HistoryTrimmer = HistoryTrimmer { messages ->
-            messages.zipWithNext()
-                .filter { (user, assistant) -> user.role == ChatRole.User && assistant.role == ChatRole.Assistant }
-                .takeLast(16)
-                .flatMap { (user, assistant) -> listOf(user, assistant) }
-        }
+        public val DropOldest: HistoryTrimmer =
+            HistoryTrimmer { messages ->
+                messages
+                    .zipWithNext()
+                    .filter { (user, assistant) -> user.role == ChatRole.User && assistant.role == ChatRole.Assistant }
+                    .takeLast(16)
+                    .flatMap { (user, assistant) -> listOf(user, assistant) }
+            }
     }
 }
 

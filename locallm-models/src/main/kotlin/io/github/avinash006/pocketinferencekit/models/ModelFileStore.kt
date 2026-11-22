@@ -2,17 +2,21 @@ package io.github.avinash006.pocketinferencekit.models
 
 import android.annotation.SuppressLint
 import io.github.avinash006.pocketinferencekit.core.LocalLMException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 
-internal class ModelFileStore(val directory: File) {
+internal class ModelFileStore(
+    val directory: File,
+) {
     fun file(model: ModelSpec): File = File(directory, "${model.sha256.lowercase()}.litertlm")
+
     fun partial(model: ModelSpec): File = File(directory, "${model.sha256.lowercase()}.part")
+
     fun validator(model: ModelSpec): File = File(directory, "${model.sha256.lowercase()}.validator")
 
     fun prepare(requiredBytes: Long) {
@@ -28,7 +32,10 @@ internal class ModelFileStore(val directory: File) {
     @SuppressLint("UsableSpace")
     fun hasSpace(bytes: Long): Boolean = directory.usableSpace >= bytes
 
-    suspend fun verify(file: File, model: ModelSpec) {
+    suspend fun verify(
+        file: File,
+        model: ModelSpec,
+    ) {
         if (!file.isFile) throw LocalLMException.ModelNotFound(model.id)
         if (file.length() != model.sizeBytes) throw LocalLMException.ChecksumMismatch(model.id)
         val digest = MessageDigest.getInstance("SHA-256")
@@ -45,7 +52,10 @@ internal class ModelFileStore(val directory: File) {
         if (!actual.equals(model.sha256, ignoreCase = true)) throw LocalLMException.ChecksumMismatch(model.id)
     }
 
-    fun install(partial: File, target: File) {
+    fun install(
+        partial: File,
+        target: File,
+    ) {
         if (!partial.renameTo(target)) throw LocalLMException.DownloadFailed("Could not atomically install the model file.")
     }
 
@@ -55,18 +65,20 @@ internal class ModelFileStore(val directory: File) {
         }
     }
 
-    fun lease(file: File): ModelLease = synchronized(leases) {
-        val key = file.absolutePath
-        leases[key] = leases.getOrDefault(key, 0) + 1
-        ModelLease(file) {
-            synchronized(leases) {
-                val remaining = leases.getValue(key) - 1
-                if (remaining == 0) leases.remove(key) else leases[key] = remaining
+    fun lease(file: File): ModelLease =
+        synchronized(leases) {
+            val key = file.absolutePath
+            leases[key] = leases.getOrDefault(key, 0) + 1
+            ModelLease(file) {
+                synchronized(leases) {
+                    val remaining = leases.getValue(key) - 1
+                    if (remaining == 0) leases.remove(key) else leases[key] = remaining
+                }
             }
         }
-    }
 
     fun isLeased(file: File): Boolean = synchronized(leases) { file.absolutePath in leases }
+
     fun lock(model: ModelSpec): Mutex = mutexes[(file(model).absolutePath.hashCode() and Int.MAX_VALUE) % mutexes.size]
 
     companion object {
