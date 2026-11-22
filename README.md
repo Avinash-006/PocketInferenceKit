@@ -20,4 +20,8 @@ Use JDK 21 with Android SDK Platform 37.2 and Build Tools 36.0.0.
 ./gradlew build
 ```
 
+## Sample app
+
+Run the `:sample` app on Android to select a model, manage its download, and stream a chat response. A device recording is pending.
+
 Licensed under [Apache 2.0](LICENSE).
