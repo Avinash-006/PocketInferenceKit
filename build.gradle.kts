@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.spotless)
+    id("pocketinferencekit.documentation")
 }
 
 allprojects {
     group = "io.github.Avinash-006"
-    version = "0.1.0-SNAPSHOT"
+    version = providers.gradleProperty("releaseVersion").orElse("0.1.0-SNAPSHOT").get()
 }
 
 spotless {
@@ -27,6 +28,9 @@ val detektCli =
 
 dependencies {
     add(detektCli.name, libs.detekt.cli)
+    add("dokka", project(":locallm-core"))
+    add("dokka", project(":locallm-models"))
+    add("dokka", project(":locallm-compose"))
 }
 
 tasks.register<JavaExec>("detekt") {

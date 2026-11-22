@@ -1,6 +1,7 @@
 [versions]
 agp = "9.5.2"
 kotlin = "2.4.21"
+dokka = "2.3.0"
 abi-validator = "0.18.2"
 asm = "9.11.1"
 spotless = "8.12.0"
@@ -24,6 +25,7 @@ android-min = "24"
 android-target = "37"
 
 [libraries]
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 abi-validator = { module = "org.jetbrains.kotlinx:binary-compatibility-validator", version.ref = "abi-validator" }
 kotlin-metadata-jvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlin" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }

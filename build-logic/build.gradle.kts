@@ -7,4 +7,5 @@ dependencies {
     implementation(libs.kotlin.gradle.plugin)
     implementation(libs.kotlin.compose.gradle.plugin)
     implementation(libs.abi.validator)
+    implementation(libs.dokka.gradle.plugin)
 }

@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      CENTRAL_SIGNING_KEY: ${{ secrets.CENTRAL_SIGNING_KEY }}
+      CENTRAL_SIGNING_PASSWORD: ${{ secrets.CENTRAL_SIGNING_PASSWORD }}
+      CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+      CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Ensure Android SDK packages are installed
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-37.2/android.jar" ||
+                ! -x "$ANDROID_HOME/build-tools/36.0.0/aapt2" ]]; then
+            sdkmanager 'platforms;android-37.2' 'build-tools;36.0.0'
+          fi
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Verify release
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != tag || ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'Run this workflow on a semantic release tag.'
+            exit 1
+          fi
+          ./gradlew --no-daemon build -PreleaseVersion="${GITHUB_REF_NAME#v}"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          awk -v header="## [$version]" '
+            index($0, header) == 1 { output = 1; next }
+            output && /^## / { exit }
+            output && /^\[/ { exit }
+            output { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "PocketInferenceKit $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+      - name: Publish to Maven Central when configured
+        run: |
+          set -euo pipefail
+          if [[ -z "$CENTRAL_SIGNING_KEY" || -z "$CENTRAL_USERNAME" || -z "$CENTRAL_PASSWORD" ]]; then
+            echo 'Maven Central publishing skipped. Configure the signing key and portal token.'
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          ./gradlew --no-daemon publishAllPublicationsToCentralRepository -PreleaseVersion="$version"
+          python3 - "$version" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+          import zipfile
+
+          version = sys.argv[1]
+          repository = pathlib.Path("build/central-repository")
+          version_dirs = sorted(repository.glob(f"io/github/Avinash-006/pocketinferencekit-*/{version}"))
+          if len(version_dirs) != 3:
+              raise SystemExit("Expected all three Maven artifacts in the upload bundle")
+          checksum_types = ("md5", "sha1", "sha256", "sha512")
+          with zipfile.ZipFile("build/central-bundle.zip", "w", zipfile.ZIP_DEFLATED) as bundle:
+              for directory in version_dirs:
+                  files = sorted(
+                      path for path in directory.iterdir()
+                      if path.is_file() and path.suffix not in {f".{name}" for name in checksum_types}
+                  )
+                  for path in files:
+                      if path.suffix != ".asc" and not path.with_suffix(path.suffix + ".asc").is_file():
+                          raise SystemExit(f"Missing signature for {path.name}")
+                      relative = path.relative_to(repository).as_posix()
+                      content = path.read_bytes()
+                      bundle.writestr(relative, content)
+                      if path.suffix != ".asc":
+                          for algorithm in checksum_types:
+                              bundle.writestr(f"{relative}.{algorithm}", hashlib.new(algorithm, content).hexdigest())
+          PY
+          auth=$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w0)
+          printf '::add-mask::%s\n' "$auth"
+          deployment=$(curl --fail-with-body --silent --show-error --request POST \
+            --header "Authorization: Bearer $auth" \
+            --form "bundle=@build/central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=PocketInferenceKit-$version&publishingType=AUTOMATIC")
+          echo "Maven Central deployment uploaded: $deployment"

@@ -12,7 +12,7 @@ The Kotlin formatter is Spotless with ktlint. Detekt analyzes the primary Androi
 ./gradlew :locallm-core:createDebugUnitTestCoverageReport :locallm-models:createDebugUnitTestCoverageReport
 ```
 
-The current JVM line coverage is 62.8% in core and 31.0% in models. The target is 80% for each module. JVM tests exercise generation, model transfer, validation, and lifecycle logic. Model-backed and Android-only paths need device tests.
+The current JVM line coverage is 62.8% in core and 31.0% in models. The target is 80% for each module. JVM tests exercise generation, model transfer, validation, and lifecycle logic. Model-backed and Android-only paths need device tests. [Coverage backlog](https://github.com/Avinash-006/PocketInferenceKit/issues/8)
 
 ## Optional native CPU smoke test
 
